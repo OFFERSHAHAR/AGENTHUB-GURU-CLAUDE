@@ -256,10 +256,10 @@ export function Layout({ children }: { children: ReactNode }) {
             <div
               className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[11px] text-white"
               style={{
-                background: currentUser?.username === "aor"
+                background: currentUser?.username === "or"
                   ? "linear-gradient(135deg, #0ea5e9, #06b6d4)"
                   : "linear-gradient(135deg, #7c3aed, #4f46e5)",
-                boxShadow: currentUser?.username === "aor"
+                boxShadow: currentUser?.username === "or"
                   ? "0 0 8px rgba(14,165,233,0.4)"
                   : "0 0 8px rgba(124,58,237,0.4)",
               }}

@@ -29,7 +29,7 @@ function ClientRowSkeleton() {
   );
 }
 
-type OwnerFilter = "mine" | "all" | "eli" | "aor";
+type OwnerFilter = "mine" | "all" | "offer" | "or";
 
 export default function ClientsPage() {
   const queryClient = useQueryClient();
@@ -67,15 +67,15 @@ export default function ClientsPage() {
   const ownerFilteredClients = regularClients.filter((c: any) => {
     if (ownerFilter === "all") return true;
     if (ownerFilter === "mine") return c.ownerUser === currentUser?.username || !c.ownerUser;
-    return c.ownerUser === ownerFilter || (!c.ownerUser && ownerFilter === "eli");
+    return c.ownerUser === ownerFilter || (!c.ownerUser && ownerFilter === "offer");
   });
 
   const visibleClients = ownerFilteredClients.filter(
     (c) => !onlyDedup || dedupByClient.has(c.id),
   );
 
-  const eliCount = regularClients.filter((c: any) => c.ownerUser === "eli" || !c.ownerUser).length;
-  const aorCount = regularClients.filter((c: any) => c.ownerUser === "aor").length;
+  const eliCount = regularClients.filter((c: any) => c.ownerUser === "offer" || !c.ownerUser).length;
+  const aorCount = regularClients.filter((c: any) => c.ownerUser === "or").length;
 
   const handleDelete = (id: number, name: string) => {
     deleteClient.mutate({ id }, {
@@ -111,8 +111,8 @@ export default function ClientsPage() {
           <Users className="w-3.5 h-3.5 text-muted-foreground mr-1" />
           {([
             { key: "all", label: "הכל", count: regularClients.length },
-            { key: "eli", label: "אלי", count: eliCount },
-            { key: "aor", label: "אור", count: aorCount },
+            { key: "offer", label: "עופר", count: eliCount },
+            { key: "or", label: "אור", count: aorCount },
           ] as { key: OwnerFilter; label: string; count: number }[]).map(({ key, label, count }) => {
             const active = ownerFilter === key;
             return (
@@ -122,7 +122,7 @@ export default function ClientsPage() {
                 className="flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-full border transition-colors"
                 style={
                   active
-                    ? { background: key === "aor" ? "#e0f2fe" : key === "eli" ? "rgba(124,58,237,0.1)" : "#f1f5f9", color: key === "aor" ? "#0369a1" : key === "eli" ? "#7c3aed" : "#334155", borderColor: key === "aor" ? "#7dd3fc" : key === "eli" ? "rgba(124,58,237,0.3)" : "#cbd5e1" }
+                    ? { background: key === "or" ? "#e0f2fe" : key === "offer" ? "rgba(124,58,237,0.1)" : "#f1f5f9", color: key === "or" ? "#0369a1" : key === "offer" ? "#7c3aed" : "#334155", borderColor: key === "or" ? "#7dd3fc" : key === "offer" ? "rgba(124,58,237,0.3)" : "#cbd5e1" }
                     : { background: "white", color: "#94a3b8", borderColor: "#e2e8f0" }
                 }
               >

@@ -6,13 +6,13 @@ const router: IRouter = Router();
 const COOKIE_NAME = "ah_auth";
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 
-// המזהה הפנימי "eli" מייצג את עופר (משמש לשיוך בעלות לקוחות בכל ה-frontend).
+// המזהה הפנימי "offer" מייצג את עופר (משמש לשיוך בעלות לקוחות בכל ה-frontend).
 // שם התצוגה הוא "עופר". לא לשנות את המזהה הפנימי בלי מיגרציה של ownerUser ב-DB.
-type Username = "eli" | "aor";
+type Username = "offer" | "or";
 
 const USERS: { username: Username; displayName: string; getPassword: () => string }[] = [
-  { username: "eli", displayName: "עופר", getPassword: () => process.env.APP_ACCESS_PASSWORD ?? "" },
-  { username: "aor", displayName: "אור", getPassword: () => process.env.AOR_ACCESS_PASSWORD ?? "" },
+  { username: "offer", displayName: "עופר", getPassword: () => process.env.APP_ACCESS_PASSWORD ?? "" },
+  { username: "or", displayName: "אור", getPassword: () => process.env.AOR_ACCESS_PASSWORD ?? "" },
 ];
 
 function cookieOptions() {
@@ -48,8 +48,8 @@ function getUserInfo(cookieVal: string | undefined): { authenticated: boolean; u
   if (!cookieVal) return { authenticated: false, user: null, displayName: null };
   const found = USERS.find((u) => u.username === cookieVal);
   if (found) return { authenticated: true, user: found.username, displayName: found.displayName };
-  // Legacy: old cookie value was "1" — treat as "eli" (=עופר)
-  if (cookieVal === "1") return { authenticated: true, user: "eli", displayName: "עופר" };
+  // Legacy: old cookie value was "1" — treat as "offer" (=עופר)
+  if (cookieVal === "1") return { authenticated: true, user: "offer", displayName: "עופר" };
   return { authenticated: false, user: null, displayName: null };
 }
 

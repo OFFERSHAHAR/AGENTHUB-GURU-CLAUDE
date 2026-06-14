@@ -6,7 +6,7 @@ const API_BASE = (import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "") + "/api";
 type GateState = "checking" | "anon" | "authed";
 
 export type AppUser = {
-  username: "eli" | "aor";
+  username: "offer" | "or";
   displayName: string;
 };
 
@@ -28,7 +28,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       const r = await fetch(`${API_BASE}/auth/session`, { credentials: "include" });
       const data = await r.json();
       if (data?.authenticated) {
-        setUser({ username: data.user ?? "eli", displayName: data.displayName ?? "אדמין" });
+        setUser({ username: data.user ?? "offer", displayName: data.displayName ?? "אדמין" });
         setState("authed");
       } else {
         setState("anon");
@@ -54,7 +54,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       });
       if (r.ok) {
         const data = await r.json();
-        setUser({ username: data.user ?? "eli", displayName: data.displayName ?? "אדמין" });
+        setUser({ username: data.user ?? "offer", displayName: data.displayName ?? "אדמין" });
         setPassword("");
         setState("authed");
         return;

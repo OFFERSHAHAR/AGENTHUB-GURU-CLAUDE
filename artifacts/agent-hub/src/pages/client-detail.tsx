@@ -3365,7 +3365,7 @@ function ClientOwnerCard({ client, clientId }: { client: any; clientId: number }
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetClientQueryKey(clientId) });
           queryClient.invalidateQueries({ queryKey: getListClientsQueryKey() });
-          toast({ title: value === "none" ? "הבעלות נוקתה" : `הלקוח שוייך ל${value === "eli" ? "אלי" : "אור"}` });
+          toast({ title: value === "none" ? "הבעלות נוקתה" : `הלקוח שוייך ל${value === "offer" ? "עופר" : "אור"}` });
           setSaving(false);
         },
         onError: () => { toast({ title: "שמירה נכשלה", variant: "destructive" }); setSaving(false); },
@@ -3375,8 +3375,8 @@ function ClientOwnerCard({ client, clientId }: { client: any; clientId: number }
 
   const OWNERS = [
     { value: "none", label: "ללא בעלים", color: "#94a3b8", bg: "#f1f5f9" },
-    { value: "eli", label: "אלי", color: "#7c3aed", bg: "rgba(124,58,237,0.08)" },
-    { value: "aor", label: "אור", color: "#0ea5e9", bg: "rgba(14,165,233,0.08)" },
+    { value: "offer", label: "עופר", color: "#7c3aed", bg: "rgba(124,58,237,0.08)" },
+    { value: "or", label: "אור", color: "#0ea5e9", bg: "rgba(14,165,233,0.08)" },
   ];
 
   return (
@@ -3398,11 +3398,11 @@ function ClientOwnerCard({ client, clientId }: { client: any; clientId: number }
           <span
             className="text-[11px] font-bold px-2.5 py-1 rounded-full"
             style={{
-              background: current === "eli" ? "rgba(124,58,237,0.1)" : "rgba(14,165,233,0.1)",
-              color: current === "eli" ? "#7c3aed" : "#0ea5e9",
+              background: current === "offer" ? "rgba(124,58,237,0.1)" : "rgba(14,165,233,0.1)",
+              color: current === "offer" ? "#7c3aed" : "#0ea5e9",
             }}
           >
-            {current === "eli" ? "אלי" : "אור"}
+            {current === "offer" ? "עופר" : "אור"}
           </span>
         )}
       </div>

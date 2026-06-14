@@ -241,11 +241,11 @@ function ClientGridModule({
                         <span
                           className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
                           style={{
-                            background: c.ownerUser === "eli" ? "rgba(124,58,237,0.1)" : "rgba(14,165,233,0.1)",
-                            color: c.ownerUser === "eli" ? "#7c3aed" : "#0ea5e9",
+                            background: c.ownerUser === "offer" ? "rgba(124,58,237,0.1)" : "rgba(14,165,233,0.1)",
+                            color: c.ownerUser === "offer" ? "#7c3aed" : "#0ea5e9",
                           }}
                         >
-                          {c.ownerUser === "eli" ? "אלי" : "אור"}
+                          {c.ownerUser === "offer" ? "עופר" : "אור"}
                         </span>
                       )}
                     </div>
@@ -383,11 +383,11 @@ function ClientDetailPanel({ client, events }: {
                 <span
                   className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                   style={{
-                    background: client.ownerUser === "eli" ? "rgba(124,58,237,0.1)" : "rgba(14,165,233,0.1)",
-                    color: client.ownerUser === "eli" ? "#7c3aed" : "#0ea5e9",
+                    background: client.ownerUser === "offer" ? "rgba(124,58,237,0.1)" : "rgba(14,165,233,0.1)",
+                    color: client.ownerUser === "offer" ? "#7c3aed" : "#0ea5e9",
                   }}
                 >
-                  {client.ownerUser === "eli" ? "אלי" : "אור"}
+                  {client.ownerUser === "offer" ? "עופר" : "אור"}
                 </span>
               )}
             </div>
