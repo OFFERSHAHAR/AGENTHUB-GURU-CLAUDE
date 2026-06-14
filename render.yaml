@@ -10,27 +10,22 @@
 # פריסה: Render ▸ New ▸ Blueprint ▸ בחר את הריפו (קורא קובץ זה).
 # ============================================================================
 
-databases:
-  - name: hub-db
-    databaseName: hub
-    user: hub
-    plan: free            # ⚠️ free פג אחרי 90 יום — שדרג ל-basic/standard לפרודקשן
+# הערה: ה-DB אינו ב-Render אלא ב-Neon (חינם וקבוע). מגדירים DATABASE_URL ידנית
+# מתוך מחרוזת החיבור של Neon (כולל ?sslmode=require).
 
 services:
-  # ---------- שרת ה-API (Node, ללא Docker) ----------
+  # ---------- שרת ה-API (Node, ללא Docker, חינם) ----------
   - type: web
     name: agenthub-guru-claude-api
     runtime: node
-    plan: starter         # Node web service; starter כדי שלא "יישן"
+    plan: free            # חינם; נרדם אחרי 15 דק' חוסר פעילות (cold start ~50ש')
     region: frankfurt
     autoDeploy: true
     buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @workspace/api-server build
     startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: hub-db
-          property: connectionString
+        sync: false        # הדבק את מחרוזת החיבור של Neon
       - key: SESSION_SECRET
         generateValue: true
       - key: NODE_ENV
