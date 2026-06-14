@@ -1,54 +1,51 @@
 # ============================================================================
-# Render Blueprint — פריסת ההאב (agent-hub + api-server + Postgres)
-# פריסה: Render Dashboard ▸ New ▸ Blueprint ▸ חבר את הריפו (קורא קובץ זה).
-# אותו Dockerfile של הריפו משמש לבנייה (ב-Linux → פותר את ה-pinning).
+# Render Blueprint — פריסה ללא Docker (native runtimes)
+# ----------------------------------------------------------------------------
+# 3 רכיבים:
+#   1) agenthub-guru-claude      — Static Site (frontend agent-hub)
+#   2) agenthub-guru-claude-api  — Web Service Node (api-server)
+#   3) hub-db                    — PostgreSQL מנוהל
+# ה-frontend פונה ל-API דרך Rewrite (/api/* -> שירות ה-API), כך נשמר אותו origin.
+# בנייה רצה ב-Linux אצל Render → ה-pinning ל-linux-x64 נפתר אוטומטית.
+# פריסה: Render ▸ New ▸ Blueprint ▸ בחר את הריפו (קורא קובץ זה).
 # ============================================================================
 
 databases:
   - name: hub-db
     databaseName: hub
     user: hub
-    plan: free            # ⚠️ free פג אחרי 90 יום — שדרג ל-"starter" לפרודקשן
+    plan: free            # ⚠️ free פג אחרי 90 יום — שדרג ל-basic/standard לפרודקשן
 
 services:
+  # ---------- שרת ה-API (Node, ללא Docker) ----------
   - type: web
-    name: agenthub-guru-claude
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    plan: starter         # starter ומעלה; free לא תומך ב-Docker רציף
-    region: frankfurt     # קרוב לישראל; אפשר oregon/virginia
-    healthCheckPath: /
+    name: agenthub-guru-claude-api
+    runtime: node
+    plan: starter         # Node web service; starter כדי שלא "יישן"
+    region: frankfurt
     autoDeploy: true
+    buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @workspace/api-server build
+    startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
     envVars:
-      # --- חובה ---
       - key: DATABASE_URL
         fromDatabase:
           name: hub-db
           property: connectionString
       - key: SESSION_SECRET
-        generateValue: true          # Render מייצר מחרוזת אקראית
+        generateValue: true
       - key: NODE_ENV
         value: production
-      - key: API_PORT
-        value: "5000"
-      # PORT — Render מזריק אוטומטית; Caddy מאזין עליו. אל תגדיר ידנית.
+      # PORT — Render מזריק אוטומטית; api-server קורא אותו.
       - key: APP_BASE_URL
-        sync: false                  # מלא בדאשבורד אחרי שיש דומיין
-
-      # --- שערי גישה ---
+        sync: false
       - key: APP_ACCESS_PASSWORD
         sync: false
       - key: AOR_ACCESS_PASSWORD
         sync: false
-
-      # --- מייל (Resend) ---
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM
         sync: false
-
-      # --- טלגרם ---
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_CHAT_ID
@@ -57,23 +54,40 @@ services:
         sync: false
       - key: TELEGRAM_WEBHOOK_SECRET
         sync: false
-
-      # --- וואטסאפ ---
       - key: WHATSAPP_TOKEN
         sync: false
       - key: WHATSAPP_PHONE_NUMBER_ID
         sync: false
       - key: WHATSAPP_LINK
         sync: false
-
-      # --- AI ---
       - key: OPENAI_API_KEY
         sync: false
       - key: GROQ_API_KEY
         sync: false
-
-      # --- שונות ---
       - key: INTAKE_FORM_URL
         sync: false
       - key: LOG_LEVEL
         value: info
+
+  # ---------- ה-frontend (Static Site, ללא Docker) ----------
+  - type: web
+    name: agenthub-guru-claude
+    runtime: static
+    buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @workspace/agent-hub build
+    staticPublishPath: artifacts/agent-hub/dist/public
+    envVars:
+      - key: BASE_PATH
+        value: /
+      - key: PORT
+        value: "5000"      # vite.config דורש PORT גם בבנייה (ערך דמה)
+      - key: NODE_ENV
+        value: production
+    routes:
+      # פרוקסי כל /api/* אל שרת ה-API (שומר אותו origin עבור ה-frontend)
+      - type: rewrite
+        source: /api/*
+        destination: https://agenthub-guru-claude-api.onrender.com/api/*
+      # SPA fallback — כל שאר הנתיבים ל-index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
