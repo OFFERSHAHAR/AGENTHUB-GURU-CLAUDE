@@ -12,7 +12,7 @@ databases:
 
 services:
   - type: web
-    name: agent-hub
+    name: agenthub-guru-claude
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
