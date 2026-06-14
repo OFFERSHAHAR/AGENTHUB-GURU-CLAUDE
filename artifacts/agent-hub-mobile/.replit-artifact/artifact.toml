@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/agent-hub-mobile/"
+title = "AgentHub Mobile"
+version = "1.0.0"
+id = "artifacts/agent-hub-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/agent-hub-mobile/" ]
+localPort = 24363
+
+[services.development]
+run = "pnpm --filter @workspace/agent-hub-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/agent-hub-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/agent-hub-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "24363"
+BASE_PATH = "/agent-hub-mobile/"

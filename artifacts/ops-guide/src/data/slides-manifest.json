@@ -1,0 +1,58 @@
+[
+  {
+    "id": "slide-01-title",
+    "position": 1,
+    "filepath": "src/pages/slides/slide01.tsx",
+    "title": "כותרת — מדריך תפעול AgentHub",
+    "description": "שקופית פתיחה עם לוגו, שם המדריך ותגיות ראשיות",
+    "speakerNotes": "ברוכים הבאים למדריך התפעול של AgentHub — הפלטפורמה לניהול סוכני AI"
+  },
+  {
+    "id": "slide-02-architecture",
+    "position": 2,
+    "filepath": "src/pages/slides/slide02.tsx",
+    "title": "ארכיטקטורת המערכת",
+    "description": "4 שכבות: ממשק, לוגיקה, אוטומציה, נתונים",
+    "speakerNotes": "המערכת בנויה ב-4 שכבות — ממשק React, API Express, n8n לאוטומציה, PostgreSQL לנתונים"
+  },
+  {
+    "id": "slide-03-maintenance",
+    "position": 3,
+    "filepath": "src/pages/slides/slide03.tsx",
+    "title": "סוכן התחזוקה — 05:00 יומי",
+    "description": "בדיקות יומיות אוטומטיות: DB, n8n, שמות סוכנים, מדדים, דוח לצוות",
+    "speakerNotes": "כל בוקר ב-05:00 מופעלות 6 בדיקות. בסיום נשלח דוח ב-Telegram"
+  },
+  {
+    "id": "slide-04-live-dashboard",
+    "position": 4,
+    "filepath": "src/pages/slides/slide04.tsx",
+    "title": "לוח מחוונים חי — לכל לקוח",
+    "description": "ביצועים בזמן אמת, אירועים, ניטור שגיאות, polling כל 5 שניות",
+    "speakerNotes": "כל לקוח מקבל לוח ייעודי עם עדכון חי. polling כל 5 שניות ללא רענון"
+  },
+  {
+    "id": "slide-05-self-healing",
+    "position": 5,
+    "filepath": "src/pages/slides/slide05.tsx",
+    "title": "סוכני תיקון בזמן אמת",
+    "description": "4 תרחישי כשל ואיך המערכת מטפלת בהם ללא שבירת זרימה",
+    "speakerNotes": "המטרה: הלקוח לא ירגיש בתקלה. כל טיפול בפנים, שקוף לחלוטין"
+  },
+  {
+    "id": "slide-06-roadmap",
+    "position": 6,
+    "filepath": "src/pages/slides/slide06.tsx",
+    "title": "שדרוגים מתוכננים — רודמאפ",
+    "description": "מה בוצע, מה בבנייה, מה מתוכנן ל-Q3-Q4 2026",
+    "speakerNotes": "הצגת המפה הכוללת: מה כבר יש, מה בדרך, ומה בחזון"
+  },
+  {
+    "id": "slide-07-daily-ops",
+    "position": 7,
+    "filepath": "src/pages/slides/slide07.tsx",
+    "title": "נהלי תפעול יומיים",
+    "description": "לוח זמנים תפעולי, עקרונות מנחים, כלים מרכזיים",
+    "speakerNotes": "לוח הזמנים מ-05:00 עד 23:00 — אוטומטי וידני — ועקרונות הליבה"
+  }
+]

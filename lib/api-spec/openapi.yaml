@@ -1,0 +1,2401 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: AgentHub - AI Agent Management Platform API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: webhooks
+    description: Incoming webhook triggers from external client apps
+  - name: health
+    description: Health operations
+  - name: agents
+    description: AI Agent operations
+  - name: clients
+    description: Client (company) operations
+  - name: assignments
+    description: Agent assignment operations
+  - name: orchestrator
+    description: Orchestrator configuration
+  - name: stats
+    description: Dashboard statistics
+  - name: workflows
+    description: Visual workflow canvas operations
+  - name: telegram
+    description: Telegram bot integration
+  - name: spec-agent
+    description: Specification Agent — conversational AI for generating automation specs
+  - name: lang-agent
+    description: Language Expert Agent — domain-aware multilingual document translation and adaptation
+  - name: logs
+    description: Agent operation logs and AI-generated analysis summaries
+  - name: study
+    description: Study Listener — real-time lecture transcription and AI-generated study documents
+  - name: settings
+    description: Global platform settings configurable by ops
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /agents:
+    get:
+      operationId: listAgents
+      tags: [agents]
+      summary: List all AI agents
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Agent"
+    post:
+      operationId: createAgent
+      tags: [agents]
+      summary: Create a new AI agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentInput"
+      responses:
+        "201":
+          description: Created agent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+
+  /agents/categories:
+    get:
+      operationId: listAgentCategories
+      tags: [agents]
+      summary: List agent categories with counts
+      responses:
+        "200":
+          description: Categories with agent counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentCategory"
+
+  /agents/{id}:
+    get:
+      operationId: getAgent
+      tags: [agents]
+      summary: Get agent by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Agent details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateAgent
+      tags: [agents]
+      summary: Update an agent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentUpdate"
+      responses:
+        "200":
+          description: Updated agent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteAgent
+      tags: [agents]
+      summary: Delete an agent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /clients:
+    get:
+      operationId: listClients
+      tags: [clients]
+      summary: List all clients
+      responses:
+        "200":
+          description: List of clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Client"
+    post:
+      operationId: createClient
+      tags: [clients]
+      summary: Create a new client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientInput"
+      responses:
+        "201":
+          description: Created client
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+
+  /clients/{id}:
+    get:
+      operationId: getClient
+      tags: [clients]
+      summary: Get client by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Client details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateClient
+      tags: [clients]
+      summary: Update a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientUpdate"
+      responses:
+        "200":
+          description: Updated client
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteClient
+      tags: [clients]
+      summary: Delete a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /clients/{id}/assignments:
+    get:
+      operationId: listClientAssignments
+      tags: [assignments]
+      summary: List agent assignments for a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Assignment"
+    post:
+      operationId: createAssignment
+      tags: [assignments]
+      summary: Assign an agent to a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignmentInput"
+      responses:
+        "201":
+          description: Created assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assignment"
+
+  /clients/{id}/assignments/{agentId}:
+    patch:
+      operationId: updateAssignment
+      tags: [assignments]
+      summary: Update an agent assignment customization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignmentUpdate"
+      responses:
+        "200":
+          description: Updated assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assignment"
+        "404":
+          description: Not found
+    delete:
+      operationId: removeAssignment
+      tags: [assignments]
+      summary: Remove an agent from a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+
+  /assignments/{id}/automation:
+    patch:
+      operationId: toggleAutomation
+      tags: [assignments]
+      summary: Enable or disable automation for a single assignment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AutomationTogglePayload"
+      responses:
+        "200":
+          description: Updated assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assignment"
+        "404":
+          description: Not found
+
+  /clients/{id}/automations/disable-all:
+    post:
+      operationId: disableAllAutomations
+      tags: [assignments]
+      summary: Master kill switch — disable all automations for a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MasterKillPayload"
+      responses:
+        "200":
+          description: Count of disabled automations
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [disabled]
+                properties:
+                  disabled:
+                    type: integer
+
+  /clients/{id}/automation-logs:
+    get:
+      operationId: listAutomationLogs
+      tags: [assignments]
+      summary: Get automation shutdown logs for a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of automation logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AutomationLog"
+
+  /clients/{id}/orchestrator:
+    get:
+      operationId: getOrchestrator
+      tags: [orchestrator]
+      summary: Get orchestrator config for a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Orchestrator config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrchestratorConfig"
+        "404":
+          description: Not found
+    put:
+      operationId: upsertOrchestrator
+      tags: [orchestrator]
+      summary: Create or update orchestrator config for a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrchestratorInput"
+      responses:
+        "200":
+          description: Updated orchestrator config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrchestratorConfig"
+
+  /stats/summary:
+    get:
+      operationId: getStatsSummary
+      tags: [stats]
+      summary: Get dashboard summary statistics
+      responses:
+        "200":
+          description: Summary stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsSummary"
+
+  /activity/recent:
+    get:
+      operationId: listRecentActivity
+      tags: [stats]
+      summary: Get recent activity feed
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Recent activity events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEvent"
+
+  /workflows:
+    get:
+      operationId: listWorkflows
+      tags: [workflows]
+      summary: List all workflows
+      responses:
+        "200":
+          description: List of workflows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Workflow"
+    post:
+      operationId: createWorkflow
+      tags: [workflows]
+      summary: Create a new workflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowInput"
+      responses:
+        "201":
+          description: Created workflow
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+
+  /workflows/{id}:
+    get:
+      operationId: getWorkflow
+      tags: [workflows]
+      summary: Get workflow by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Workflow details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateWorkflow
+      tags: [workflows]
+      summary: Update a workflow (save canvas state)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowUpdate"
+      responses:
+        "200":
+          description: Updated workflow
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteWorkflow
+      tags: [workflows]
+      summary: Delete a workflow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /telegram/webhook:
+    post:
+      operationId: telegramWebhook
+      tags: [telegram]
+      summary: Receive Telegram bot updates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelegramUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelegramWebhookResult"
+
+  /telegram/setup:
+    post:
+      operationId: setupTelegramWebhook
+      tags: [telegram]
+      summary: Register webhook URL with Telegram
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelegramSetupInput"
+      responses:
+        "200":
+          description: Setup result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelegramSetupResult"
+
+  /conversations/client/{clientId}/agent/{agentId}:
+    get:
+      operationId: getOrCreateConversation
+      tags: [conversations]
+      summary: Get or create conversation for a client+agent pair
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+
+  /conversations/{id}:
+    get:
+      operationId: getConversation
+      tags: [conversations]
+      summary: Get a conversation by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+    delete:
+      operationId: clearConversation
+      tags: [conversations]
+      summary: Clear conversation memory (reset to empty)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+
+  /conversations/{id}/messages:
+    post:
+      operationId: sendMessage
+      tags: [conversations]
+      summary: Send a user message and get AI response
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageInput"
+      responses:
+        "200":
+          description: Response pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendMessageResult"
+
+  /telegram/status:
+    get:
+      operationId: getTelegramStatus
+      tags: [telegram]
+      summary: Get Telegram bot status and pending client count
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelegramStatus"
+
+  /spec-agent/chat:
+    post:
+      operationId: specAgentChat
+      tags: [spec-agent]
+      summary: Spec Agent conversational chat turn
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpecAgentChatInput"
+      responses:
+        "200":
+          description: Agent reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpecAgentChatResult"
+
+  /logs:
+    get:
+      operationId: listAgentLogs
+      tags: [logs]
+      summary: List agent operation logs with optional filters
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: source
+          in: query
+          required: false
+          schema: { type: string }
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+        - name: since
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentLog"
+
+  /logs/summary:
+    get:
+      operationId: getLogSummary
+      tags: [logs]
+      summary: Get the latest AI-generated log summary
+      responses:
+        "200":
+          description: Latest summary or null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentLogSummary"
+
+  /logs/analyze:
+    post:
+      operationId: triggerLogAnalysis
+      tags: [logs]
+      summary: Manually trigger log analysis
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TriggerLogAnalysisInput"
+      responses:
+        "200":
+          description: Analysis triggered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  message:
+                    type: string
+
+  /settings/dedup-warn-threshold:
+    get:
+      operationId: getDedupWarnThreshold
+      tags: [settings]
+      summary: Get the duplicate-warning threshold (number of deduped events in 7 days before ops are warned)
+      responses:
+        "200":
+          description: Current threshold
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DedupWarnThresholdSetting"
+    put:
+      operationId: updateDedupWarnThreshold
+      tags: [settings]
+      summary: Update the duplicate-warning threshold
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DedupWarnThresholdUpdate"
+      responses:
+        "200":
+          description: Updated threshold
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DedupWarnThresholdSetting"
+        "400":
+          description: Invalid threshold value
+
+  /trigger-stats/summary:
+    get:
+      operationId: getTriggerStatsSummary
+      tags: [stats]
+      summary: Cross-client roll-up of integrations with a high duplicate rate (last 7 days)
+      responses:
+        "200":
+          description: High-dedup-rate summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TriggerStatsSummary"
+
+  /settings/dedup-warn-threshold/history:
+    get:
+      operationId: getDedupWarnThresholdHistory
+      tags: [settings]
+      summary: Get the change history of the duplicate-warning threshold (most recent first)
+      responses:
+        "200":
+          description: Threshold change history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DedupWarnThresholdHistory"
+
+  /settings/dedup-window:
+    get:
+      operationId: getDedupWindow
+      tags: [settings]
+      summary: Get the duplicate-detection rolling window length (hours + days + chosen unit)
+      responses:
+        "200":
+          description: Current window length
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DedupWindowSetting"
+    put:
+      operationId: updateDedupWindow
+      tags: [settings]
+      summary: Update the duplicate-detection rolling window length (value + unit of hours or days)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DedupWindowUpdate"
+      responses:
+        "200":
+          description: Updated window length
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DedupWindowSetting"
+        "400":
+          description: Invalid window value
+
+  /settings/dedup-window/history:
+    get:
+      operationId: getDedupWindowHistory
+      tags: [settings]
+      summary: Get the change history of the duplicate-detection window length (most recent first)
+      responses:
+        "200":
+          description: Window length change history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DedupWindowHistory"
+
+  /settings/webhook-telegram-notifications:
+    get:
+      operationId: getWebhookTelegramNotifications
+      tags: [settings]
+      summary: Get whether the "Webhook Triggered" Telegram notification is enabled
+      responses:
+        "200":
+          description: Current toggle state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookTelegramNotificationsSetting"
+    put:
+      operationId: updateWebhookTelegramNotifications
+      tags: [settings]
+      summary: Enable or disable the "Webhook Triggered" Telegram notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookTelegramNotificationsUpdate"
+      responses:
+        "200":
+          description: Updated toggle state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookTelegramNotificationsSetting"
+        "400":
+          description: Invalid request body
+  /clients/{id}/report:
+    get:
+      operationId: getClientReport
+      tags: [clients]
+      summary: Per-client usage & performance report (agent task volume over last 30 days)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Usage report aggregating agent activity for this client
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientReport"
+        "400":
+          description: Invalid client id
+        "404":
+          description: Client not found
+
+  /settings/webhook-telegram-notifications/history:
+    get:
+      operationId: getWebhookTelegramNotificationsHistory
+      tags: [settings]
+      summary: Get the change history of the "Webhook Triggered" Telegram notification toggle (most recent first)
+      responses:
+        "200":
+          description: Toggle change history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookTelegramNotificationsHistory"
+
+  /clients/{id}/trigger-stats:
+    get:
+      operationId: getClientTriggerStats
+      tags: [clients]
+      summary: Get duplicate-suppression stats for a client across all assignments (last 7 days)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Dedup stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientTriggerStats"
+        "400":
+          description: Invalid client id
+
+  /assignments/{id}/trigger:
+    get:
+      operationId: getAssignmentTrigger
+      tags: [assignments]
+      summary: Get trigger config for an assignment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Trigger config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentTrigger"
+        "404":
+          description: Not found
+    post:
+      operationId: createAssignmentTrigger
+      tags: [assignments]
+      summary: Create or regenerate a webhook trigger for an assignment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Trigger config with fresh secret
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentTrigger"
+
+  /assignments/{id}/trigger/events:
+    get:
+      operationId: listAssignmentTriggerEvents
+      tags: [assignments]
+      summary: List trigger fire history for an assignment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of trigger events newest-first (up to 20)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TriggerEvent"
+        "404":
+          description: No trigger configured for this assignment
+
+  /clients/{id}/trigger/events:
+    get:
+      operationId: listClientTriggerEvents
+      tags: [assignments]
+      summary: List all trigger events for a client across all assigned agents (newest first, max 20)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of trigger events newest-first (up to 20)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClientTriggerEvent"
+
+  /webhooks/trigger/{secret}:
+    post:
+      operationId: fireWebhookTrigger
+      tags: [webhooks]
+      summary: Receive an inbound webhook event from a client's live app
+      parameters:
+        - name: secret
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPayload"
+      responses:
+        "200":
+          description: Event received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookTriggerResult"
+        "404":
+          description: Unknown secret
+        "409":
+          description: Agent already running for this trigger
+
+  /study/summarize:
+    post:
+      operationId: studySummarize
+      tags: [study]
+      summary: Generate lecture summary and homework list from full transcript
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudySummarizeInput"
+      responses:
+        "200":
+          description: Generated study documents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudySummarizeResult"
+
+  /study/sessions:
+    get:
+      operationId: listStudySessions
+      tags: [study]
+      summary: List all past study sessions
+      responses:
+        "200":
+          description: List of study sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudySession"
+    post:
+      operationId: createStudySession
+      tags: [study]
+      summary: Log a completed study session and post to AgentHub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudySessionInput"
+      responses:
+        "201":
+          description: Created session record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudySession"
+
+  /study/sessions/{id}:
+    get:
+      operationId: getStudySession
+      tags: [study]
+      summary: Get a specific study session by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Study session detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudySession"
+        "404":
+          description: Not found
+
+  /lang-agent/translate:
+    post:
+      operationId: langAgentTranslate
+      tags: [lang-agent]
+      summary: Translate and domain-adapt a document with expert language
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LangAgentTranslateInput"
+      responses:
+        "200":
+          description: Translated and adapted document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LangAgentTranslateResult"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    Agent:
+      type: object
+      required: [id, name, description, category, status, capabilities, deployedCount, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        status:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        iconEmoji:
+          type: ["string", "null"]
+        deployedCount:
+          type: integer
+        createdAt:
+          type: string
+        model:
+          type: ["string", "null"]
+        temperature:
+          type: ["number", "null"]
+        maxTokens:
+          type: ["integer", "null"]
+        systemPrompt:
+          type: ["string", "null"]
+        responseFormat:
+          type: ["string", "null"]
+        memoryType:
+          type: ["string", "null"]
+        timeout:
+          type: ["integer", "null"]
+        retryCount:
+          type: ["integer", "null"]
+        triggerType:
+          type: ["string", "null"]
+        tags:
+          type: array
+          items:
+            type: string
+        inputSchema:
+          type: ["string", "null"]
+        outputSchema:
+          type: ["string", "null"]
+
+    AgentInput:
+      type: object
+      required: [name, description, category, capabilities]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        category:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        iconEmoji:
+          type: string
+        status:
+          type: string
+        model:
+          type: string
+        temperature:
+          type: number
+        maxTokens:
+          type: integer
+        systemPrompt:
+          type: string
+        responseFormat:
+          type: string
+        memoryType:
+          type: string
+        timeout:
+          type: integer
+        retryCount:
+          type: integer
+        triggerType:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        inputSchema:
+          type: string
+        outputSchema:
+          type: string
+
+    AgentUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        category:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        iconEmoji:
+          type: string
+        status:
+          type: string
+        model:
+          type: string
+        temperature:
+          type: number
+        maxTokens:
+          type: integer
+        systemPrompt:
+          type: string
+        responseFormat:
+          type: string
+        memoryType:
+          type: string
+        timeout:
+          type: integer
+        retryCount:
+          type: integer
+        triggerType:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        inputSchema:
+          type: string
+        outputSchema:
+          type: string
+
+    AgentCategory:
+      type: object
+      required: [category, count, activeCount]
+      properties:
+        category:
+          type: string
+        count:
+          type: integer
+        activeCount:
+          type: integer
+
+    Client:
+      type: object
+      required: [id, name, industry, contactEmail, status, agentCount, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        industry:
+          type: string
+        contactEmail:
+          type: string
+        status:
+          type: string
+        agentCount:
+          type: integer
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        source:
+          type: string
+        tier:
+          type: string
+        rawSpec:
+          type: ["string", "null"]
+        analysisStatus:
+          type: ["string", "null"]
+        analysisDoc:
+          type: ["string", "null"]
+        telegramChatId:
+          type: ["string", "null"]
+
+    ClientInput:
+      type: object
+      required: [name, industry, contactEmail]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        industry:
+          type: string
+        contactEmail:
+          type: string
+        status:
+          type: string
+        notes:
+          type: string
+        source:
+          type: string
+        tier:
+          type: string
+        rawSpec:
+          type: string
+        analysisStatus:
+          type: string
+        analysisDoc:
+          type: string
+        telegramChatId:
+          type: string
+
+    ClientUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        industry:
+          type: string
+        contactEmail:
+          type: string
+        status:
+          type: string
+        notes:
+          type: string
+        tier:
+          type: string
+        analysisStatus:
+          type: string
+        analysisDoc:
+          type: string
+        telegramChatId:
+          type: string
+
+    ConversationMessage:
+      type: object
+      required: [role, content, createdAt]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant, system]
+        content:
+          type: string
+        createdAt:
+          type: string
+        provider:
+          type: string
+        model:
+          type: string
+        tokens:
+          type: integer
+
+    Conversation:
+      type: object
+      required: [id, clientId, agentId, messages, messageCount, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        clientId:
+          type: integer
+        agentId:
+          type: integer
+        title:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationMessage"
+        messageCount:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    SendMessageInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+
+    SendMessageResult:
+      type: object
+      required: [userMessage, assistantMessage]
+      properties:
+        userMessage:
+          $ref: "#/components/schemas/ConversationMessage"
+        assistantMessage:
+          $ref: "#/components/schemas/ConversationMessage"
+
+    TelegramUpdate:
+      type: object
+      description: Raw Telegram update object (passthrough)
+      additionalProperties: true
+
+    TelegramWebhookResult:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        clientId:
+          type: integer
+
+    TelegramSetupInput:
+      type: object
+      required: [webhookUrl]
+      properties:
+        webhookUrl:
+          type: string
+
+    TelegramSetupResult:
+      type: object
+      required: [ok, description]
+      properties:
+        ok:
+          type: boolean
+        description:
+          type: string
+
+    TelegramStatus:
+      type: object
+      required: [configured, webhookUrl]
+      properties:
+        configured:
+          type: boolean
+        webhookUrl:
+          type: ["string", "null"]
+        pendingClients:
+          type: integer
+
+    Assignment:
+      type: object
+      required: [id, clientId, agentId, status, automationEnabled, createdAt]
+      properties:
+        id:
+          type: integer
+        clientId:
+          type: integer
+        agentId:
+          type: integer
+        status:
+          type: string
+        automationEnabled:
+          type: boolean
+        customization:
+          type: ["string", "null"]
+        deployedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        agent:
+          $ref: "#/components/schemas/Agent"
+
+    AutomationLog:
+      type: object
+      required: [id, assignmentId, clientId, agentId, action, disabledBy, createdAt]
+      properties:
+        id:
+          type: integer
+        assignmentId:
+          type: integer
+        clientId:
+          type: integer
+        agentId:
+          type: integer
+        action:
+          type: string
+        disabledBy:
+          type: string
+        reason:
+          type: ["string", "null"]
+        lastErrors:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    AutomationTogglePayload:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+        disabledBy:
+          type: string
+        reason:
+          type: string
+
+    MasterKillPayload:
+      type: object
+      properties:
+        disabledBy:
+          type: string
+        reason:
+          type: string
+
+    AssignmentInput:
+      type: object
+      required: [agentId]
+      properties:
+        agentId:
+          type: integer
+        customization:
+          type: string
+        status:
+          type: string
+
+    AssignmentUpdate:
+      type: object
+      properties:
+        customization:
+          type: string
+        status:
+          type: string
+        deployedAt:
+          type: string
+
+    OrchestratorConfig:
+      type: object
+      required: [id, clientId, routingRules, updatedAt]
+      properties:
+        id:
+          type: integer
+        clientId:
+          type: integer
+        routingRules:
+          type: string
+        description:
+          type: ["string", "null"]
+        updatedAt:
+          type: string
+
+    OrchestratorInput:
+      type: object
+      required: [routingRules]
+      properties:
+        routingRules:
+          type: string
+        description:
+          type: string
+
+    StatsSummary:
+      type: object
+      required: [totalAgents, activeAgents, totalClients, activeClients, totalDeployments, categoryCounts]
+      properties:
+        totalAgents:
+          type: integer
+        activeAgents:
+          type: integer
+        totalClients:
+          type: integer
+        activeClients:
+          type: integer
+        totalDeployments:
+          type: integer
+        categoryCounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentCategory"
+
+    ActivityEvent:
+      type: object
+      required: [id, type, message, entityType, entityId, createdAt]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        message:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: integer
+        createdAt:
+          type: string
+
+    Workflow:
+      type: object
+      required: [id, name, status, nodes, edges, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+        nodes:
+          type: string
+        edges:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: ["string", "null"]
+
+    WorkflowInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        status:
+          type: string
+        nodes:
+          type: string
+        edges:
+          type: string
+
+    WorkflowUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        status:
+          type: string
+        nodes:
+          type: string
+        edges:
+          type: string
+
+    SpecAgentChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+
+    SpecAgentChatInput:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpecAgentChatMessage"
+
+    SpecAgentChatResult:
+      type: object
+      required: [reply]
+      properties:
+        reply:
+          type: string
+
+    TriggerLogAnalysisInput:
+      type: object
+      properties:
+        windowMinutes:
+          type: integer
+
+    AgentLog:
+      type: object
+      required: [id, timestamp, source, eventType, status]
+      properties:
+        id:
+          type: integer
+        timestamp:
+          type: string
+        source:
+          type: string
+        agentId:
+          type: integer
+          nullable: true
+        agentName:
+          type: string
+          nullable: true
+        clientId:
+          type: integer
+          nullable: true
+        conversationId:
+          type: integer
+          nullable: true
+        eventType:
+          type: string
+        status:
+          type: string
+        inputSummary:
+          type: string
+          nullable: true
+        outputSummary:
+          type: string
+          nullable: true
+        provider:
+          type: string
+          nullable: true
+        model:
+          type: string
+          nullable: true
+        inputTokens:
+          type: integer
+          nullable: true
+        outputTokens:
+          type: integer
+          nullable: true
+        estimatedCostUsd:
+          type: number
+          nullable: true
+        durationMs:
+          type: integer
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        metadata:
+          nullable: true
+
+    AgentLogSummary:
+      type: object
+      required: [id, createdAt, windowStart, windowEnd, totalEvents, successCount, errorCount, warningCount, summaryText]
+      properties:
+        id:
+          type: integer
+        createdAt:
+          type: string
+        windowStart:
+          type: string
+        windowEnd:
+          type: string
+        totalEvents:
+          type: integer
+        successCount:
+          type: integer
+        errorCount:
+          type: integer
+        warningCount:
+          type: integer
+        summaryText:
+          type: string
+        failurePoints:
+          type: array
+          items: {}
+        activeAgents:
+          type: array
+          items: {}
+        recommendations:
+          type: array
+          items:
+            type: string
+        rawStats:
+          nullable: true
+
+    ReportDailyPoint:
+      type: object
+      required: [date, count]
+      properties:
+        date:
+          type: string
+          description: Calendar date (YYYY-MM-DD, UTC)
+        count:
+          type: integer
+          description: Number of tasks handled on this day
+
+    ClientReportAgent:
+      type: object
+      required: [assignmentId, agentId, agentName, category, status, tasksHandled, successCount, failureCount, dailyVolume]
+      properties:
+        assignmentId:
+          type: integer
+        agentId:
+          type: integer
+        agentName:
+          type: string
+        category:
+          type: string
+        iconEmoji:
+          type: string
+          nullable: true
+        status:
+          type: string
+          description: Assignment status (active/inactive)
+        tasksHandled:
+          type: integer
+          description: Total tasks handled by this agent in the window
+        successCount:
+          type: integer
+          description: Number of successful task outcomes (agent_logs status=success) in the window
+        failureCount:
+          type: integer
+          description: Number of failed task outcomes (agent_logs status=error) in the window
+        lastActive:
+          type: string
+          nullable: true
+          description: ISO timestamp of the most recent activity, or null if none
+        dailyVolume:
+          type: array
+          description: Per-day task volume for this agent (oldest-first)
+          items:
+            $ref: "#/components/schemas/ReportDailyPoint"
+
+    ClientReport:
+      type: object
+      required: [clientId, clientName, windowDays, generatedAt, totalTasks, totalSuccess, totalFailure, agents, dailyTotals]
+      properties:
+        clientId:
+          type: integer
+        clientName:
+          type: string
+        windowDays:
+          type: integer
+          description: Number of days the report window covers
+        generatedAt:
+          type: string
+          description: ISO timestamp when the report was generated
+        totalTasks:
+          type: integer
+          description: Total tasks handled across all agents in the window
+        totalSuccess:
+          type: integer
+          description: Total successful task outcomes across the client in the window
+        totalFailure:
+          type: integer
+          description: Total failed task outcomes across the client in the window
+        agents:
+          type: array
+          description: Per-agent usage rows, sorted by tasks handled (descending)
+          items:
+            $ref: "#/components/schemas/ClientReportAgent"
+        dailyTotals:
+          type: array
+          description: Client-level per-day task volume (oldest-first)
+          items:
+            $ref: "#/components/schemas/ReportDailyPoint"
+
+    DedupDailyPoint:
+      type: object
+      required: [date, count]
+      properties:
+        date:
+          type: string
+          description: >-
+            Bucket key (UTC). A calendar date (YYYY-MM-DD) when breakdownUnit is
+            "day", or a full ISO hour (YYYY-MM-DDTHH:00:00Z) when breakdownUnit
+            is "hour" (sub-day windows).
+        count:
+          type: integer
+          description: Number of deduplicated events in this bucket
+
+    DedupWarnThresholdUpdate:
+      type: object
+      required: [threshold]
+      properties:
+        threshold:
+          type: integer
+          minimum: 1
+          description: New threshold value
+        changedBy:
+          type: string
+          maxLength: 120
+          description: Name or identifier of the person making the change
+
+    DedupWarnThresholdSetting:
+      type: object
+      required: [threshold]
+      properties:
+        threshold:
+          type: integer
+          description: Number of deduplicated events in 7 days that triggers the high-rate warning
+
+    TriggerStatsSummary:
+      type: object
+      required: [highDedupCount, windowDays, windowHours, windowUnit, affectedClients]
+      properties:
+        highDedupCount:
+          type: integer
+          description: Total number of integrations (assignments) flagged with a high duplicate rate
+        windowDays:
+          type: number
+          description: Number of days the window covers (windowHours / 24)
+        windowHours:
+          type: integer
+          description: Canonical window length in hours
+        windowUnit:
+          type: string
+          enum: [hours, days]
+          description: Unit chosen by ops for display
+        affectedClients:
+          type: array
+          items:
+            type: object
+            required: [clientId, clientName, count]
+            properties:
+              clientId:
+                type: integer
+              clientName:
+                type: string
+              count:
+                type: integer
+                description: Number of integrations with a high duplicate rate for this client
+
+    DedupWarnThresholdHistory:
+      type: object
+      required: [history]
+      properties:
+        history:
+          type: array
+          description: Threshold change entries, most recent first
+          items:
+            type: object
+            required: [id, newValue, changedBy, changedAt]
+            properties:
+              id:
+                type: integer
+              oldValue:
+                type: integer
+                nullable: true
+                description: Previous threshold value, or null if this was the first change
+              newValue:
+                type: integer
+                description: New threshold value after the change
+              changedBy:
+                type: string
+                description: Who made the change
+              changedAt:
+                type: string
+                format: date-time
+                description: When the change was made
+
+    WebhookTelegramNotificationsSetting:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+          description: Whether the "Webhook Triggered" Telegram notification is sent on a real fire
+
+    WebhookTelegramNotificationsUpdate:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+          description: Set to false to mute the "Webhook Triggered" Telegram notification
+        changedBy:
+          type: string
+          maxLength: 120
+          description: Name or identifier of the person making the change
+
+    WebhookTelegramNotificationsHistory:
+      type: object
+      required: [history]
+      properties:
+        history:
+          type: array
+          description: Toggle change entries, most recent first
+          items:
+            type: object
+            required: [id, enabled, changedBy, changedAt]
+            properties:
+              id:
+                type: integer
+              previousEnabled:
+                type: boolean
+                nullable: true
+                description: Previous toggle state, or null if this was the first change
+              enabled:
+                type: boolean
+                description: New toggle state after the change
+              changedBy:
+                type: string
+                description: Who made the change
+              changedAt:
+                type: string
+                format: date-time
+                description: When the change was made
+
+    DedupWindowUpdate:
+      type: object
+      required: [value, unit]
+      properties:
+        value:
+          type: integer
+          minimum: 1
+          maximum: 8760
+          description: >-
+            New rolling-window length, interpreted in the given unit. Must not
+            exceed 365 days / 8760 hours.
+        unit:
+          type: string
+          enum: [hours, days]
+          description: Unit the value is expressed in
+        changedBy:
+          type: string
+          maxLength: 120
+          description: Name or identifier of the person making the change
+
+    DedupWindowSetting:
+      type: object
+      required: [windowHours, windowDays, unit]
+      properties:
+        windowHours:
+          type: integer
+          description: Canonical rolling-window length in hours
+        windowDays:
+          type: number
+          description: Rolling-window length in days (windowHours / 24)
+        unit:
+          type: string
+          enum: [hours, days]
+          description: Unit chosen by ops for display
+
+    DedupWindowHistory:
+      type: object
+      required: [history]
+      properties:
+        history:
+          type: array
+          description: Window-length change entries (values in hours), most recent first
+          items:
+            type: object
+            required: [id, newValueHours, changedBy, changedAt]
+            properties:
+              id:
+                type: integer
+              oldValueHours:
+                type: integer
+                nullable: true
+                description: Previous window length in hours, or null if this was the first change
+              newValueHours:
+                type: integer
+                description: New window length in hours after the change
+              changedBy:
+                type: string
+                description: Who made the change
+              changedAt:
+                type: string
+                format: date-time
+                description: When the change was made
+
+    ClientTriggerStats:
+      type: object
+      required: [totalDeduplicated, windowDays, windowHours, windowUnit, breakdownUnit, dailyBreakdown, perAssignment]
+      properties:
+        totalDeduplicated:
+          type: integer
+          description: Total deduplicated events across all assignments in the window
+        windowDays:
+          type: number
+          description: Number of days the window covers (windowHours / 24)
+        windowHours:
+          type: integer
+          description: Canonical window length in hours
+        windowUnit:
+          type: string
+          enum: [hours, days]
+          description: Unit chosen by ops for display
+        breakdownUnit:
+          type: string
+          enum: [hour, day]
+          description: >-
+            Bucket granularity of every dailyBreakdown series in this response.
+            "hour" for sub-day windows (< 24h), "day" otherwise.
+        dailyBreakdown:
+          type: array
+          description: Per-bucket dedup counts (client-level aggregate, oldest-first)
+          items:
+            $ref: "#/components/schemas/DedupDailyPoint"
+        warnThreshold:
+          type: integer
+          description: The current dedup warning threshold (from DB setting or env var fallback)
+        perAssignment:
+          type: array
+          items:
+            type: object
+            required: [assignmentId, deduplicated, highDedupRate, dailyBreakdown]
+            properties:
+              assignmentId:
+                type: integer
+              deduplicated:
+                type: integer
+              highDedupRate:
+                type: boolean
+                description: True when deduplicated count meets or exceeds the warn threshold
+              dailyBreakdown:
+                type: array
+                description: Per-day dedup counts for this assignment
+                items:
+                  $ref: "#/components/schemas/DedupDailyPoint"
+
+    TriggerEvent:
+      type: object
+      required: [id, triggerId, assignmentId, agentStatus, firedAt]
+      properties:
+        id:
+          type: integer
+        triggerId:
+          type: integer
+        assignmentId:
+          type: integer
+        payload:
+          nullable: true
+        agentStatus:
+          type: string
+          description: Agent execution state at time of event (triggered/running/idle/deduplicated)
+        agentOutput:
+          type: string
+          nullable: true
+          description: The agent's response text, populated when agentStatus is idle
+        firedAt:
+          type: string
+
+    ClientTriggerEvent:
+      type: object
+      required: [id, triggerId, assignmentId, agentStatus, firedAt, agentName]
+      properties:
+        id:
+          type: integer
+        triggerId:
+          type: integer
+        assignmentId:
+          type: integer
+        payload:
+          nullable: true
+        agentStatus:
+          type: string
+          description: Agent execution state at time of event (triggered/running/idle)
+        firedAt:
+          type: string
+        agentName:
+          type: string
+          description: Name of the agent that fired this event
+
+    AssignmentTrigger:
+      type: object
+      required: [id, assignmentId, webhookUrl, status, createdAt, recentEvents]
+      properties:
+        id:
+          type: integer
+        assignmentId:
+          type: integer
+        webhookUrl:
+          type: string
+        status:
+          type: string
+        lastFiredAt:
+          type: ["string", "null"]
+        lastPayload:
+          nullable: true
+        createdAt:
+          type: string
+        recentEvents:
+          type: array
+          description: Up to 10 most recent trigger events
+          items:
+            $ref: "#/components/schemas/TriggerEvent"
+
+    WebhookPayload:
+      type: object
+      description: Arbitrary JSON payload from a client's live app
+      additionalProperties: true
+
+    WebhookTriggerResult:
+      type: object
+      required: [received, agentId, clientId]
+      properties:
+        received:
+          type: boolean
+        agentId:
+          type: integer
+        clientId:
+          type: integer
+
+    StudySummarizeInput:
+      type: object
+      required: [transcript]
+      properties:
+        transcript:
+          type: string
+          minLength: 1
+        subject:
+          type: string
+
+    StudySummarizeResult:
+      type: object
+      required: [summary, homework]
+      properties:
+        summary:
+          type: string
+        homework:
+          type: string
+
+    StudySessionInput:
+      type: object
+      required: [subject, transcript, summary, homework, durationMs]
+      properties:
+        subject:
+          type: string
+        transcript:
+          type: string
+        summary:
+          type: string
+        homework:
+          type: string
+        durationMs:
+          type: integer
+        inputTokens:
+          type: integer
+        outputTokens:
+          type: integer
+        estimatedCostUsd:
+          type: number
+
+    StudySession:
+      type: object
+      required: [id, subject, transcript, summary, homework, durationMs, createdAt]
+      properties:
+        id:
+          type: integer
+        subject:
+          type: string
+        transcript:
+          type: string
+        summary:
+          type: string
+        homework:
+          type: string
+        durationMs:
+          type: integer
+        inputTokens:
+          type: ["integer", "null"]
+        outputTokens:
+          type: ["integer", "null"]
+        estimatedCostUsd:
+          type: ["number", "null"]
+        agentLogId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    LangAgentTranslateInput:
+      type: object
+      required: [content, targetLanguage]
+      properties:
+        content:
+          type: string
+          minLength: 1
+        targetLanguage:
+          type: string
+        documentType:
+          type: string
+
+    LangAgentTranslateResult:
+      type: object
+      required: [translatedContent, detectedDomain, targetLanguage]
+      properties:
+        translatedContent:
+          type: string
+        detectedDomain:
+          type: string
+        targetLanguage:
+          type: string
+        domainLabel:
+          type: string

@@ -1,0 +1,31 @@
+kind = "slides"
+previewPath = "/product-review/"
+title = "AgentHub — Product Review Q2 2026"
+version = "1.0.0"
+id = "artifacts/product-review"
+router = "path"
+
+[[integratedSkills]]
+name = "slides"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/product-review/" ]
+localPort = 22643
+
+[services.development]
+run = "pnpm --filter @workspace/product-review run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/product-review", "run", "build" ]
+publicDir = "artifacts/product-review/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22643"
+BASE_PATH = "/product-review/"

@@ -1,0 +1,19 @@
+uploads = []
+
+[[generated]]
+id = "-C1DOUaIUWbN3ItcOPzLn"
+uri = "file://artifacts/agent-hub-mobile/assets/images/icon.png"
+type = "image"
+title = "agenthub app icon"
+
+[[outputs]]
+id = "gaXkjw_PDyTprR_-QSv-2"
+uri = "file://docs/AgentHub-Spec.pdf"
+type = "pdf"
+title = "AgentHub — מפרט מערכת מלא (PDF)"
+
+[[outputs]]
+id = "s8tyu9z0BR3P2l_qAl_Xs"
+uri = "file://.local/outputs/Review-Metrics-Roadmap.pdf"
+type = "pdf"
+title = "Review Metrics Roadmap.pdf"

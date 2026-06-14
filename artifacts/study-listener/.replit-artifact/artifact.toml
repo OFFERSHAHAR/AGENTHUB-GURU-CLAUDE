@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/study-listener/"
+title = "Study Listener — סוכן האזנה לשיעורים"
+version = "1.0.0"
+id = "artifacts/study-listener"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/study-listener/" ]
+localPort = 8099
+
+[services.development]
+run = "node serve.mjs"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/study-listener", "run", "build" ]
+publicDir = "artifacts/study-listener/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "8099"
+BASE_PATH = "/study-listener/"

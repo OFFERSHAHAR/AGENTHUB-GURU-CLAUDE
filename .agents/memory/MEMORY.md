@@ -1,0 +1,26 @@
+- [API naming collision rule](api-naming-rule.md) — never use `<OperationIdPascal>Body` as OpenAPI component name; causes TS2308 in codegen
+- [DB migration command](db-commands.md) — push schema: `pnpm --filter @workspace/db run push-force`; codegen: `pnpm --filter @workspace/api-spec run codegen`
+- [Trigger system design](trigger-system.md) — webhook trigger system: triggers table per assignment, secret UUID, status idle/triggered/running, webhookUrl derived from request host at runtime
+- [API /api prefix](api-prefix.md) — all Express routes mounted at /api; direct curl tests must include /api prefix
+- [Non-root artifact dev server](non-root-artifact-dev.md) — Vite dev server fails for non-root path artifacts; use static file server (serve.mjs) as the workflow dev command instead
+- [rpa-connectors update verb](rpa-connectors-update-verb.md) — connector edits use PATCH /rpa-connectors/:id (NO PUT handler exists); using PUT silently fails
+- [Trigger SSE push channel](trigger-sse-stream.md) — instant dashboard updates via in-process event bus + per-client SSE stream; polling kept as fallback; SSE id = durable trigger_events.id (survives restart); ring buffer fast path + DB backfill for gaps the ring can't cover
+- [Jarvis Telegram bridge](jarvis-telegram-bridge.md) — desktop holds SSE to /api/jarvis/stream, Mini App polls /result; desktop is executor; new commands go in parseCommand+handleCmd
+- [API server test runner](api-server-tests.md) — node:test + tsx (`pnpm --filter @workspace/api-server run test`); SSE route testing pattern; typecheck pre-broken by stale db dist
+- [Dedup breakdown buckets](dedup-breakdown-buckets.md) — trigger-stats breakdownUnit: windowHours<24 → hourly ISO-hour buckets, else daily; JS zero-fill keys must match SQL bucket expr
+- [Run root .cjs DB scripts](root-cjs-pg.md) — pg only deps lib/db; run with NODE_PATH=node_modules/.pnpm/pg@8.20.0/node_modules
+- [Telegram test-env guard](telegram-test-guard.md) — every Telegram-sending helper must early-return when NODE_ENV==="test"; webhook fires also gated by a settings toggle
+- [Human approval gate pattern](approval-gate-pattern.md) — atomic `UPDATE ... WHERE status='pending' RETURNING` + partial unique index (one open row per owner) is how to make a mandatory human-approval gate concurrency-safe
+- [Expo workflow port detection](expo-workflow-port-detection.md) — restart_workflow false DIDNT_OPEN_A_PORT for expo-domain artifacts though Metro serves /status 200; platform issue, don't loop
+- [Agent activity metric](agent-activity-metric.md) — "tasks handled" = trigger_events rows with agentStatus='triggered'; no agent_tasks table; keep consistent across reports
+- [Optima attended 2FA sync](optima-attended-2fa.md) — manual runs require a live in-memory per-connector session (no unattended auto-login); one-time 2FA code forwarded once, never stored; scheduler stays on old path
+- [Journal Q&A feature](journal-qa.md) — agent answers client occupancy questions from palgate_permits; tag-gated (journal-qa/journal-ingest); counts computed in JS + deterministic fallback; ingest dedup must include unit
+- [Hebrew RTL PDF generation](hebrew-rtl-pdf.md) — Chromium can't launch on this Nix host; use fpdf2+python-bidi+Alef via uv, manual wrap + per-line get_display, explicit width
+- [Expo mobile routes & SSE](mobile-routing-sse.md) — new routes need dev-server typegen + object pathname; no EventSource on native, polling is the fallback; clipboard = expo-clipboard
+- [Optima → PalGate chaining](optima-palgate-chain.md) — "palgat" is overloaded (salary adapter vs gate-access permit subsystem); on Optima approveAndApply, occupancy added/removed feed palgate_permits; dedup/removal MUST be clientId-scoped
+- [Multi-user auth system](multi-user-auth.md) — two users: eli (APP_ACCESS_PASSWORD) + aor (AOR_ACCESS_PASSWORD); cookie stores username; session returns {user,displayName}; UserContext in auth-gate.tsx
+- [Client ownership](client-ownership.md) — ownerUser column on clients table; PATCH /clients/:id accepts ownerUser; filter tabs in clients.tsx; ClientOwnerCard in client-detail.tsx
+- [Groq TPM + Hebrew prompts](groq-tpm-hebrew.md) — Hebrew tokenizes ~3-4 tok/word; long Hebrew system prompts easily exceed Groq 8B's 6K TPM; keep spec-agent prompt in English + inline JSON; "fallback" tier = Groq 8B (official in ModelTier)
+- [WhatsApp Meta Cloud API](whatsapp-meta.md) — WHATSAPP_TOKEN + WHATSAPP_PHONE_NUMBER_ID secrets; routes under /api/whatsapp; scheduler in whatsapp-daily.ts; settings persisted in settings table
+- [Production data migration](prod-data-migration.md) — publish ships code+schema only, not data; prod SQL read-only; write prod via fetch to live /api; add-first delete-last; clean orphan assignments first
+- [Guardrails system](guardrails-system.md) — per-assignment security layer: assignments.guardrails TEXT (JSON), GET/PATCH /assignments/:id/guardrails, service enforces input+output, 8 rule types

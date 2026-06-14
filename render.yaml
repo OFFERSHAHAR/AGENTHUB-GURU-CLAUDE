@@ -1,0 +1,79 @@
+# ============================================================================
+# Render Blueprint — פריסת ההאב (agent-hub + api-server + Postgres)
+# פריסה: Render Dashboard ▸ New ▸ Blueprint ▸ חבר את הריפו (קורא קובץ זה).
+# אותו Dockerfile של הריפו משמש לבנייה (ב-Linux → פותר את ה-pinning).
+# ============================================================================
+
+databases:
+  - name: hub-db
+    databaseName: hub
+    user: hub
+    plan: free            # ⚠️ free פג אחרי 90 יום — שדרג ל-"starter" לפרודקשן
+
+services:
+  - type: web
+    name: agent-hub
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter         # starter ומעלה; free לא תומך ב-Docker רציף
+    region: frankfurt     # קרוב לישראל; אפשר oregon/virginia
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      # --- חובה ---
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hub-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true          # Render מייצר מחרוזת אקראית
+      - key: NODE_ENV
+        value: production
+      - key: API_PORT
+        value: "5000"
+      # PORT — Render מזריק אוטומטית; Caddy מאזין עליו. אל תגדיר ידנית.
+      - key: APP_BASE_URL
+        sync: false                  # מלא בדאשבורד אחרי שיש דומיין
+
+      # --- שערי גישה ---
+      - key: APP_ACCESS_PASSWORD
+        sync: false
+      - key: AOR_ACCESS_PASSWORD
+        sync: false
+
+      # --- מייל (Resend) ---
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
+
+      # --- טלגרם ---
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: ADMIN_TELEGRAM_CHAT_ID
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+
+      # --- וואטסאפ ---
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_LINK
+        sync: false
+
+      # --- AI ---
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+      # --- שונות ---
+      - key: INTAKE_FORM_URL
+        sync: false
+      - key: LOG_LEVEL
+        value: info

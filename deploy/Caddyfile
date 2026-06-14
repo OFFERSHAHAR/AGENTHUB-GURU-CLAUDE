@@ -1,0 +1,25 @@
+# Caddy — מגיש את ה-frontend הסטטי ומעביר קריאות API ל-node הפנימי.
+# מאזין על הפורט שהפלטפורמה מזריקה ($PORT). ה-api-server רץ על {$API_PORT}.
+
+:{$PORT} {
+	encode gzip zstd
+
+	# כל מה שתחת /api -> ל-api-server הפנימי
+	@api path /api/*
+	handle @api {
+		reverse_proxy localhost:{$API_PORT}
+	}
+
+	# בריאות/וובהוקים נפוצים שלא תחת /api (לאמת מול הקוד; הסר אם לא רלוונטי)
+	@backend path /healthz /webhooks/* /telegram/*
+	handle @backend {
+		reverse_proxy localhost:{$API_PORT}
+	}
+
+	# שאר הבקשות -> קבצים סטטיים של ה-SPA, עם נפילה ל-index.html
+	handle {
+		root * /app/artifacts/agent-hub/dist/public
+		try_files {path} /index.html
+		file_server
+	}
+}

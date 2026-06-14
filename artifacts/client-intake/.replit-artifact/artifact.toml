@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/client-intake/"
+title = "AgentHub — Client Onboarding"
+version = "1.0.0"
+id = "artifacts/client-intake"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/client-intake/" ]
+localPort = 22045
+
+[services.development]
+run = "pnpm --filter @workspace/client-intake run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/client-intake", "run", "build" ]
+publicDir = "artifacts/client-intake/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22045"
+BASE_PATH = "/client-intake/"

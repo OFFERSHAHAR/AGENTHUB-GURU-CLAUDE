@@ -1,0 +1,181 @@
+{
+  "name": "Lead Email Classification and Auto Reply",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst subject = item.subject || '';\nconst text = item.textPlain || item.textHtml || item.text || '';\nconst from = item.from?.value?.[0]?.address || item.from || '';\nconst fromName = item.from?.value?.[0]?.name || '';\nconst raw = `${subject}\\n${text}`.toLowerCase();\nconst intakeLink = 'https://review-metrics-roadmap.replit.app/client-intake/';\n\nconst hotWords = ['מחיר', 'הצעת מחיר', 'דחוף', 'שיחה', 'לקנות', 'רוצה להתחיל', 'תקציב', 'פגישה', 'quote', 'pricing', 'urgent', 'call', 'demo'];\nconst supportWords = ['תמיכה', 'בעיה', 'תקלה', 'לא עובד', 'חשבונית', 'support', 'bug', 'issue', 'invoice'];\nconst spamWords = ['seo', 'backlinks', 'crypto', 'casino', 'loan', 'viagra'];\n\nlet leadStatus = 'warm';\nif (spamWords.some((word) => raw.includes(word))) leadStatus = 'spam';\nelse if (supportWords.some((word) => raw.includes(word))) leadStatus = 'support';\nelse if (hotWords.some((word) => raw.includes(word))) leadStatus = 'hot';\nelse if (raw.length < 40) leadStatus = 'cold';\n\nconst replies = {\n  hot: `שלום${fromName ? ' ' + fromName : ''},\\n\\nתודה שפנית אלינו. קיבלנו את הפנייה ונראה שיש כאן צורך שנוכל לעזור איתו במהירות.\\n\\nכדי שנוכל לאפיין את הצורך בצורה מדויקת ולחזור אליך עם כיוון מתאים, אפשר להתחיל כאן:\\n${intakeLink}\\n\\nאפשר גם להשיב למייל הזה עם זמן נוח לשיחה קצרה.\\n\\nבברכה,\\nAgentHub Guru`,\n  warm: `שלום${fromName ? ' ' + fromName : ''},\\n\\nתודה על הפנייה. קיבלנו את הפרטים ונחזור אליך בהקדם.\\n\\nכדי שנוכל לכוון אותך טוב יותר, אפשר להשלים איפיון קצר כאן:\\n${intakeLink}\\n\\nבברכה,\\nAgentHub Guru`,\n  cold: `שלום${fromName ? ' ' + fromName : ''},\\n\\nתודה על הפנייה. קיבלנו את המייל שלך.\\n\\nכדי שנוכל להבין איך לעזור, אפשר להתחיל מאיפיון קצר כאן:\\n${intakeLink}\\n\\nבברכה,\\nAgentHub Guru`,\n  support: `שלום${fromName ? ' ' + fromName : ''},\\n\\nתודה שיצרת קשר. קיבלנו את הפנייה והיא הועברה לטיפול.\\n\\nנחזור אליך בהקדם עם עדכון.\\n\\nבברכה,\\nAgentHub Guru`,\n  spam: ''\n};\n\nreturn [{\n  json: {\n    from,\n    fromName,\n    subject,\n    body: text,\n    leadStatus,\n    intakeLink,\n    replySubject: subject ? `Re: ${subject}` : 'תודה על פנייתך',\n    replyBody: replies[leadStatus],\n    shouldReply: leadStatus !== 'spam'\n  }\n}];"
+      },
+      "id": "80542092-ba68-489f-aeef-f15a2ba9721b",
+      "name": "Classify Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.shouldReply }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "de37a74a-3c0e-47b0-8211-356a63e86b3a",
+      "name": "Should Reply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        48
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1136,
+        64
+      ],
+      "id": "12f4286a-19ea-463a-8294-08d1fbd80451",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": {
+          "__rl": true,
+          "value": "AAMkADRmM2RlZTc1LTAzNjgtNDczOS05NTg2LWU4MDdjMmMzMzdlMQBGAAAAAABcnITQF_jLT7YCUjhbMGlLBwBoRkQO2fw9RqqRvC-yJOpiAAAAAAEKAABoRkQO2fw9RqqRvC-yJOpiAAAAAVMsAAA=",
+          "mode": "list",
+          "cachedResultName": "הגענמ\r\n\r\n--\r\nOFFER SHAHAR",
+          "cachedResultUrl": "https://outlook.office365.com/owa/?ItemID=AAMkADRmM2RlZTc1LTAzNjgtNDczOS05NTg2LWU4MDdjMmMzMzdlMQBGAAAAAABcnITQF%2BjLT7YCUjhbMGlLBwBoRkQO2fw9RqqRvC%2FyJOpiAAAAAAEKAABoRkQO2fw9RqqRvC%2FyJOpiAAAAAVMsAAA%3D&exvsurl=1&viewmodel=ReadMessageItem"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        48
+      ],
+      "id": "03aa6ac7-5f3d-42a9-b043-4ae4392ca4f2",
+      "name": "Get a message",
+      "webhookId": "07467805-f2f4-4bb6-bee7-1f25dbcd052f",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "uYkkc4rZ09ku3qmH",
+          "name": "Microsoft Outlook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-email-reply",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1312,
+        -64
+      ],
+      "id": "12b35f4a-0c74-4f00-ba70-0bca4a13b229",
+      "name": "Webhook",
+      "webhookId": "02911948-8fde-47c4-a8e0-31e82c1a6c79"
+    },
+    {
+      "parameters": {
+        "toRecipients": "={{$json.from}}",
+        "subject": "AGENT HUB GURU - תודה על פנייתך",
+        "bodyContent": "https://review-metrics-roadmap.replit.app/client-intake/\nעל מנת לייעל ולשפר את המוצר עבורכם השתמשו בלינק המצורף לאפיון מלא של הצורך שלכם \nצוות \nA.H.G.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -304,
+        32
+      ],
+      "id": "8c6b4b92-b7b7-460f-95f5-e96a0ff51f67",
+      "name": "Send a message",
+      "webhookId": "eeeeaae2-8c9c-4ab2-afbf-6fa50869fd45",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "uYkkc4rZ09ku3qmH",
+          "name": "Microsoft Outlook account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Classify Lead": {
+      "main": [
+        [
+          {
+            "node": "Should Reply?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Reply?": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a message": {
+      "main": [
+        [
+          {
+            "node": "Classify Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "246766cd-85d0-41c2-951c-cb2fbde54167",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fa096b8f13b7009d0fea4b89c54e0a0848fb4b66147c3ffc89cece4fd758887c"
+  },
+  "nodeGroups": [],
+  "id": "862wVAKhGHU2fwD4",
+  "tags": []
+}

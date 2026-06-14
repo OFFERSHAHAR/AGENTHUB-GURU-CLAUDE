@@ -1,0 +1,1683 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>מפרט טכני ויזואלי לסוכן AI | Agent Technical Spec</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --bg2: #eef3fb;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: rgba(15, 23, 42, 0.11);
+      --card: rgba(255, 255, 255, 0.82);
+      --glass: rgba(255, 255, 255, 0.62);
+      --blue: #2563eb;
+      --cyan: #06b6d4;
+      --green: #16a34a;
+      --amber: #f59e0b;
+      --red: #dc2626;
+      --purple: #7c3aed;
+      --shadow: 0 24px 80px rgba(15, 23, 42, 0.13);
+      --soft-shadow: 0 12px 35px rgba(15, 23, 42, 0.09);
+      --radius: 28px;
+      --radius2: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Arial", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.18), transparent 34%),
+        radial-gradient(circle at 82% 12%, rgba(6, 182, 212, 0.16), transparent 32%),
+        radial-gradient(circle at 55% 92%, rgba(124, 58, 237, 0.12), transparent 36%),
+        linear-gradient(135deg, var(--bg), var(--bg2));
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.42;
+      background-image:
+        linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: radial-gradient(circle at center, black, transparent 78%);
+    }
+
+    .page {
+      position: relative;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 36px 24px 80px;
+    }
+
+    .hero {
+      position: relative;
+      border: 1px solid rgba(255,255,255,0.9);
+      background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,255,255,0.58));
+      box-shadow: var(--shadow);
+      border-radius: 36px;
+      padding: 34px;
+      overflow: hidden;
+      backdrop-filter: blur(18px);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -12% -54% -12%;
+      height: 270px;
+      background: linear-gradient(90deg, rgba(37,99,235,0.12), rgba(6,182,212,0.12), rgba(124,58,237,0.12));
+      filter: blur(26px);
+      transform: rotate(-3deg);
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+      margin-bottom: 42px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 18px;
+      background: conic-gradient(from 210deg, var(--blue), var(--cyan), var(--purple), var(--blue));
+      box-shadow: 0 12px 26px rgba(37,99,235,0.28);
+      position: relative;
+    }
+
+    .logo::after {
+      content: "AI";
+      position: absolute;
+      inset: 7px;
+      display: grid;
+      place-items: center;
+      border-radius: 13px;
+      background: rgba(255,255,255,0.91);
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: .8px;
+      color: var(--blue);
+    }
+
+    .brand small {
+      display: block;
+      color: var(--muted);
+      margin-top: 3px;
+      font-weight: 600;
+      direction: ltr;
+      text-align: right;
+    }
+
+    .pill {
+      border: 1px solid rgba(37,99,235,0.18);
+      background: rgba(37,99,235,0.07);
+      color: #1d4ed8;
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .hero-grid {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 26px;
+      align-items: stretch;
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: clamp(34px, 5vw, 68px);
+      line-height: 1.02;
+      letter-spacing: -1.8px;
+    }
+
+    .gradient-text {
+      background: linear-gradient(90deg, #0f172a, #2563eb 48%, #7c3aed);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.75;
+      max-width: 760px;
+      margin: 0 0 26px;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .meta-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 10px 13px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.65);
+      font-weight: 750;
+      color: #334155;
+      font-size: 13px;
+    }
+
+    .agent-card {
+      border-radius: var(--radius);
+      border: 1px solid rgba(255,255,255,0.9);
+      background: linear-gradient(180deg, rgba(15,23,42,0.94), rgba(30,41,59,0.92));
+      color: white;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      min-height: 315px;
+      box-shadow: var(--soft-shadow);
+    }
+
+    .agent-card::before {
+      content: "";
+      position: absolute;
+      width: 220px;
+      height: 220px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(6,182,212,0.35), transparent 68%);
+      left: -72px;
+      top: -72px;
+    }
+
+    .agent-card::after {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 22px;
+      pointer-events: none;
+    }
+
+    .agent-card > * { position: relative; z-index: 2; }
+
+    .agent-label {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.86);
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 20px;
+    }
+
+    .agent-title {
+      font-size: 27px;
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+
+    .agent-role {
+      color: rgba(255,255,255,0.72);
+      line-height: 1.65;
+      margin-bottom: 24px;
+    }
+
+    .mini-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .mini-metric {
+      border-radius: 17px;
+      padding: 14px;
+      background: rgba(255,255,255,0.09);
+      border: 1px solid rgba(255,255,255,0.11);
+    }
+
+    .mini-metric strong {
+      display: block;
+      font-size: 21px;
+      margin-bottom: 3px;
+    }
+
+    .mini-metric span {
+      color: rgba(255,255,255,0.66);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .section {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 20px;
+    }
+
+    .panel {
+      border-radius: var(--radius);
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.82);
+      box-shadow: var(--soft-shadow);
+      backdrop-filter: blur(18px);
+      padding: 24px;
+    }
+
+    .span-4 { grid-column: span 4; }
+    .span-5 { grid-column: span 5; }
+    .span-6 { grid-column: span 6; }
+    .span-7 { grid-column: span 7; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: -.5px;
+    }
+
+    .tag {
+      border-radius: 999px;
+      padding: 7px 11px;
+      background: rgba(15,23,42,0.06);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .spec-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .spec-item {
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.58);
+    }
+
+    .ico {
+      width: 38px;
+      height: 38px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: rgba(37,99,235,0.09);
+      color: var(--blue);
+      font-weight: 900;
+    }
+
+    .spec-item strong { display: block; margin-bottom: 4px; }
+    .spec-item p { margin: 0; color: var(--muted); line-height: 1.55; font-size: 14px; }
+
+    .meters {
+      display: grid;
+      gap: 18px;
+    }
+
+    .meter-head {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-weight: 850;
+    }
+
+    .meter-head span:last-child { color: var(--muted); }
+
+    .bar {
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.08);
+      overflow: hidden;
+      border: 1px solid rgba(15,23,42,0.04);
+    }
+
+    .fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--blue), var(--cyan));
+    }
+
+    .fill.safe { background: linear-gradient(90deg, var(--green), var(--cyan)); }
+    .fill.risk { background: linear-gradient(90deg, var(--amber), var(--red)); }
+    .fill.auto { background: linear-gradient(90deg, var(--purple), var(--blue)); }
+
+    .guard-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .guard {
+      border-radius: 22px;
+      padding: 18px;
+      min-height: 168px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.68), rgba(255,255,255,0.4));
+      position: relative;
+      overflow: hidden;
+    }
+
+    .guard::before {
+      content: "";
+      position: absolute;
+      inset-inline-start: 0;
+      top: 0;
+      width: 5px;
+      height: 100%;
+      background: var(--blue);
+    }
+
+    .guard.green::before { background: var(--green); }
+    .guard.amber::before { background: var(--amber); }
+    .guard.red::before { background: var(--red); }
+    .guard.purple::before { background: var(--purple); }
+    .guard.cyan::before { background: var(--cyan); }
+
+    .guard small {
+      display: inline-block;
+      color: var(--muted);
+      font-weight: 850;
+      margin-bottom: 10px;
+    }
+
+    .guard h3 {
+      margin: 0 0 10px;
+      font-size: 17px;
+    }
+
+    .guard p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+
+
+    .audit-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .audit-card {
+      border-radius: 24px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.44));
+      position: relative;
+      overflow: hidden;
+    }
+
+    .audit-card::after {
+      content: "";
+      position: absolute;
+      inset-inline-end: -52px;
+      top: -52px;
+      width: 150px;
+      height: 150px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(37,99,235,0.13), transparent 68%);
+    }
+
+    .audit-card.output::after { background: radial-gradient(circle, rgba(124,58,237,0.14), transparent 68%); }
+
+    .audit-card h3 {
+      margin: 0 0 10px;
+      font-size: 20px;
+    }
+
+    .audit-card p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .checklist {
+      display: grid;
+      gap: 10px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .check {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 11px 12px;
+      border-radius: 15px;
+      background: rgba(255,255,255,0.62);
+      border: 1px solid rgba(15,23,42,0.07);
+      color: #334155;
+      font-size: 14px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+
+    .check i {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: rgba(22,163,74,0.10);
+      color: var(--green);
+      font-style: normal;
+      font-weight: 950;
+    }
+
+    .policy-strip {
+      margin-top: 16px;
+      padding: 16px 18px;
+      border-radius: 20px;
+      background: rgba(15,23,42,0.92);
+      color: white;
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .policy-strip strong { font-size: 18px; }
+    .policy-strip span { color: rgba(255,255,255,0.72); line-height: 1.55; font-size: 14px; }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 10px;
+      align-items: center;
+      direction: ltr;
+    }
+
+    .node {
+      direction: rtl;
+      min-height: 126px;
+      padding: 16px 12px;
+      border-radius: 22px;
+      border: 1px solid rgba(37,99,235,0.16);
+      background: rgba(255,255,255,0.62);
+      text-align: center;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 8px 18px rgba(15,23,42,0.05);
+    }
+
+    .node b {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 14px;
+    }
+
+    .node span {
+      display: block;
+      color: var(--muted);
+      line-height: 1.35;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .arrow {
+      height: 2px;
+      background: linear-gradient(90deg, rgba(37,99,235,0.18), rgba(37,99,235,0.8));
+      position: relative;
+    }
+
+    .arrow::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: -4px;
+      width: 10px;
+      height: 10px;
+      border-top: 2px solid rgba(37,99,235,0.85);
+      border-right: 2px solid rgba(37,99,235,0.85);
+      transform: rotate(45deg);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      overflow: hidden;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.56);
+    }
+
+    th, td {
+      padding: 15px 14px;
+      text-align: right;
+      border-bottom: 1px solid rgba(15,23,42,0.08);
+      vertical-align: top;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    th {
+      background: rgba(15,23,42,0.045);
+      color: #334155;
+      font-weight: 900;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .severity {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .sev-high { background: rgba(220,38,38,0.09); color: #b91c1c; }
+    .sev-med { background: rgba(245,158,11,0.13); color: #b45309; }
+    .sev-low { background: rgba(22,163,74,0.11); color: #15803d; }
+
+    .autonomy {
+      display: grid;
+      gap: 13px;
+    }
+
+    .level {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 14px;
+      align-items: center;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.58);
+    }
+
+    .level-num {
+      display: grid;
+      place-items: center;
+      height: 54px;
+      border-radius: 16px;
+      background: rgba(37,99,235,0.09);
+      color: var(--blue);
+      font-weight: 950;
+      direction: ltr;
+    }
+
+    .level.active {
+      border-color: rgba(124,58,237,0.28);
+      background: linear-gradient(90deg, rgba(124,58,237,0.11), rgba(255,255,255,0.58));
+    }
+
+    .level div:last-child strong { display: block; margin-bottom: 5px; }
+    .level div:last-child span { color: var(--muted); line-height: 1.45; font-size: 14px; }
+
+
+    .registry-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-top: 8px;
+    }
+
+    .registry-card {
+      border-radius: 22px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.42));
+      min-height: 178px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .registry-card::before {
+      content: "";
+      position: absolute;
+      inset-inline-start: 0;
+      top: 0;
+      width: 5px;
+      height: 100%;
+      background: linear-gradient(180deg, var(--blue), var(--cyan));
+    }
+
+    .registry-card.purple::before { background: linear-gradient(180deg, var(--purple), var(--blue)); }
+    .registry-card.green::before { background: linear-gradient(180deg, var(--green), var(--cyan)); }
+    .registry-card.amber::before { background: linear-gradient(180deg, var(--amber), var(--red)); }
+
+    .registry-card small {
+      display: inline-block;
+      color: var(--muted);
+      font-weight: 900;
+      margin-bottom: 8px;
+      direction: ltr;
+    }
+
+    .registry-card h3 {
+      margin: 0 0 9px;
+      font-size: 18px;
+    }
+
+    .registry-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .memory-lane {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .memory-box {
+      border-radius: 22px;
+      padding: 18px;
+      border: 1px solid rgba(15,23,42,0.10);
+      background: rgba(255,255,255,0.58);
+    }
+
+    .memory-box h3 { margin: 0 0 12px; font-size: 18px; }
+
+    .memory-row {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px dashed rgba(15,23,42,0.12);
+      align-items: start;
+    }
+
+    .memory-row:last-child { border-bottom: none; }
+    .memory-row b { color: #334155; font-size: 14px; }
+    .memory-row span { color: var(--muted); line-height: 1.5; font-size: 14px; }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .kpi-card {
+      border-radius: 20px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.62);
+    }
+
+    .kpi-card strong {
+      display: block;
+      direction: ltr;
+      text-align: right;
+      font-size: 30px;
+      letter-spacing: -0.8px;
+      margin-bottom: 6px;
+      color: #0f172a;
+    }
+
+    .kpi-card span {
+      color: var(--muted);
+      font-weight: 800;
+      line-height: 1.4;
+      font-size: 13px;
+    }
+
+    .schema-box {
+      margin-top: 16px;
+      border-radius: 24px;
+      padding: 18px;
+      background: rgba(15,23,42,0.94);
+      color: white;
+      overflow-x: auto;
+      direction: ltr;
+      text-align: left;
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .schema-box pre {
+      margin: 0;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 12px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      color: rgba(255,255,255,0.84);
+    }
+
+
+
+    .creator-grid {
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 16px;
+      margin-top: 12px;
+    }
+
+    .cadence {
+      display: grid;
+      gap: 12px;
+    }
+
+    .cadence-step {
+      display: grid;
+      grid-template-columns: 96px 1fr 88px;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.62);
+      border: 1px solid var(--line);
+    }
+
+    .cadence-step b {
+      direction: ltr;
+      color: var(--blue);
+      font-weight: 950;
+    }
+
+    .cadence-step span {
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .cadence-step em {
+      font-style: normal;
+      justify-self: end;
+      border-radius: 999px;
+      padding: 7px 10px;
+      background: rgba(37,99,235,0.10);
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .control-deck {
+      display: grid;
+      gap: 12px;
+    }
+
+    .control-card {
+      border-radius: 22px;
+      padding: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.74), rgba(255,255,255,0.46));
+      border: 1px solid var(--line);
+    }
+
+    .control-card.danger {
+      background: linear-gradient(180deg, rgba(220,38,38,0.10), rgba(255,255,255,0.54));
+      border-color: rgba(220,38,38,0.18);
+    }
+
+    .control-card.builder {
+      background: linear-gradient(180deg, rgba(124,58,237,0.12), rgba(255,255,255,0.54));
+      border-color: rgba(124,58,237,0.20);
+    }
+
+    .control-card h3 { margin: 0 0 8px; font-size: 18px; }
+    .control-card p { margin: 0; color: var(--muted); line-height: 1.55; font-size: 14px; }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .mock-button {
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-weight: 950;
+      font-size: 13px;
+      border: 1px solid rgba(15,23,42,0.10);
+      background: rgba(15,23,42,0.06);
+    }
+
+    .mock-button.danger { background: rgba(220,38,38,0.12); color: #b91c1c; }
+    .mock-button.builder { background: rgba(124,58,237,0.12); color: #6d28d9; }
+
+    .report-frame {
+      margin-top: 16px;
+      border-radius: 24px;
+      padding: 18px;
+      border: 1px solid rgba(37,99,235,0.16);
+      background: rgba(255,255,255,0.60);
+    }
+
+    .report-frame h3 { margin: 0 0 12px; font-size: 18px; }
+
+    .sample-answer {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(15,23,42,0.05);
+      border: 1px dashed rgba(15,23,42,0.16);
+      color: #334155;
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .footer {
+      margin-top: 28px;
+      padding: 22px 26px;
+      border-radius: 28px;
+      background: rgba(15,23,42,0.92);
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      box-shadow: var(--soft-shadow);
+    }
+
+    .footer p {
+      margin: 5px 0 0;
+      color: rgba(255,255,255,0.66);
+      line-height: 1.5;
+    }
+
+    .signature {
+      text-align: left;
+      direction: ltr;
+      color: rgba(255,255,255,0.82);
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .print-btn {
+      position: fixed;
+      left: 24px;
+      bottom: 24px;
+      z-index: 10;
+      border: none;
+      border-radius: 999px;
+      padding: 13px 18px;
+      background: #0f172a;
+      color: white;
+      font-weight: 900;
+      box-shadow: 0 14px 34px rgba(15,23,42,0.22);
+      cursor: pointer;
+    }
+
+    @media (max-width: 980px) {
+      .hero-grid, .section { grid-template-columns: 1fr; }
+      .span-4, .span-5, .span-6, .span-7, .span-8, .span-12 { grid-column: span 1; }
+      .guard-grid, .audit-grid, .registry-grid, .memory-lane, .kpi-grid, .creator-grid { grid-template-columns: 1fr; }
+      .cadence-step { grid-template-columns: 1fr; }
+      .cadence-step em { justify-self: start; }
+      .policy-strip { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; direction: rtl; }
+      .arrow { height: 28px; width: 2px; margin: 0 auto; background: linear-gradient(180deg, rgba(37,99,235,0.18), rgba(37,99,235,0.8)); }
+      .arrow::after { right: -4px; top: auto; bottom: 0; transform: rotate(135deg); }
+      .topbar, .footer { flex-direction: column; align-items: flex-start; }
+      .signature { text-align: right; direction: rtl; }
+    }
+
+    @media print {
+      body { background: white; }
+      body::before, .print-btn { display: none; }
+      .page { max-width: none; padding: 0; }
+      .hero, .panel, .footer { box-shadow: none; break-inside: avoid; }
+      .section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">ייצוא / הדפסה ל־PDF</button>
+
+  <main class="page">
+    <section class="hero">
+      <div class="topbar">
+        <div class="brand">
+          <div class="logo"></div>
+          <div>
+            <strong>Agent Defense Blueprint</strong>
+            <small>Premium AI Agent Technical Visual Spec</small>
+          </div>
+        </div>
+        <div class="pill">גרסה 1.4 · PRD + Product Spec · מוכן להצגה</div>
+      </div>
+
+      <div class="hero-grid">
+        <div>
+          <h1>PRD ומפרט טכני ויזואלי <span class="gradient-text">לסוכן AI</span></h1>
+          <p class="subtitle">
+            מסמך מוצר פרימיום המתאר את תפקיד הסוכן, גבולות האחריות, יכולות, רמות דיוק ובטיחות,
+            רקע ומטרות מוצר, פרופיל ותפקיד, ארכיטקטורה, תרחישי שימוש, שכבות הגנה, ביקורת קלט ופלט, הגנה מפני הזרקת פרומפט וניסיון השתלטות, שמירת לוגים, בניית זיכרון ורג׳יסטרי לאורך זמן, תקשורת יזומה עם המפתח, מדידת שיפור ודיוק וזרימת פעולה מבוקרת מקצה לקצה.
+          </p>
+          <div class="meta-row">
+            <span class="meta-chip">🧠 סוכן: Guest Arrival Verification Agent</span>
+            <span class="meta-chip">🛡️ רמת בטיחות: High</span>
+            <span class="meta-chip">👤 אישור אנושי: לפי חריגה</span>
+            <span class="meta-chip">📊 מקור אמת: DB / Sheets / Frontend</span>
+          </div>
+        </div>
+
+        <aside class="agent-card">
+          <div class="agent-label">● Agent ID: AGT-001</div>
+          <div class="agent-title">סוכן אימות הגעת אורח</div>
+          <div class="agent-role">
+            אחראי לוודא שכל פרטי האורח, החדר, התאריך והסטטוסים התפעוליים תקינים לפני שליחת הודעה אוטומטית או המשך תהליך.
+          </div>
+          <div class="mini-metrics">
+            <div class="mini-metric"><strong>94%</strong><span>דיוק צפוי בתנאי קלט תקינים</span></div>
+            <div class="mini-metric"><strong>High</strong><span>רמת בטיחות תפעולית</span></div>
+            <div class="mini-metric"><strong>L1-L2</strong><span>רמת אוטונומיה</span></div>
+            <div class="mini-metric"><strong>12</strong><span>שכבות מוצר, הגנה, ביקורת ודיווח</span></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section">
+      <article class="panel span-12">
+        <div class="section-title">
+          <h2>PRD — מפרט מוצר לסוכן</h2>
+          <span class="tag">Product Requirements Document</span>
+        </div>
+        <div class="guard-grid">
+          <div class="guard cyan">
+            <h3>01 · רקע ומטרות</h3>
+            <p><strong>הבעיה:</strong> תהליכים תפעוליים מבוססי הזמנות, חדרים והודעות עלולים להישבר בגלל חוסר התאמה בין מקור הנתונים, התצוגה והפעולה האוטומטית.</p>
+            <p><strong>המטרה:</strong> להפחית טעויות תפעול, למנוע שליחת הודעות שגויות, וליצור שכבת אימות מדידה לפני ביצוע פעולה.</p>
+            <p><strong>תוצאה רצויה:</strong> כל פעולה רגישה עוברת דרך אמת נתונים, ביקורת, לוגים ומנגנון אישור במקרה חריגה.</p>
+          </div>
+
+          <div class="guard purple">
+            <h3>02 · קהל יעד ושימוש</h3>
+            <p><strong>משתמשי קצה:</strong> מנהל מערכת, צוות תפעול, אחזקה, הזמנות, משק בית ומפתח המערכת.</p>
+            <p><strong>ערך עסקי:</strong> פחות בלבול, פחות הודעות שגויות, יותר שקיפות, מדידה לאורך זמן והפחתת תלות בזיכרון אנושי.</p>
+            <p><strong>מצבי שימוש:</strong> לפני הגעת אורח, ביום ההגעה, לפני שליחת וואטסאפ, לאחר שינוי חדר או בעת זיהוי סתירה.</p>
+          </div>
+
+          <div class="guard green">
+            <h3>03 · הגדרת תפקיד הסוכן</h3>
+            <p><strong>System Role:</strong> הסוכן פועל כמבקר תפעולי שמאמת נתונים, מזהה חריגות ומחליט אם פעולה יכולה להמשיך.</p>
+            <p><strong>טון:</strong> מקצועי, תמציתי, מבוסס עובדות, לא מנחש כאשר חסר מידע.</p>
+            <p><strong>קווים אדומים:</strong> אין שליחה, עדכון או קריאה לכלי חיצוני כאשר קיימת סתירה, Confidence נמוך או חשד להזרקת פרומפט.</p>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel span-6">
+        <div class="section-title">
+          <h2>ארכיטקטורת מוצר</h2>
+          <span class="tag">Architecture PRD</span>
+        </div>
+        <div class="spec-list">
+          <div class="spec-item"><div class="ico">LLM</div><div><strong>מודל בסיס</strong><p>ניתן להרצה מול מודל ענן או מודל מקומי. כל גרסת מודל נשמרת ב־Registry כדי למדוד שינוי ביצועים בין גרסאות.</p></div></div>
+          <div class="spec-item"><div class="ico">RAG</div><div><strong>מקורות מידע</strong><p>DB, Google Sheets, Frontend State, מסמכים תפעוליים, היסטוריית לוגים, Memory Registry ומדיניות הרשאות.</p></div></div>
+          <div class="spec-item"><div class="ico">API</div><div><strong>כלים ואינטגרציות</strong><p>קריאה ל־API, בדיקת נתונים, כתיבה ללוגים, הכנת הודעת וואטסאפ, פתיחת חריגה, התראה למפתח או העברה לאישור אנושי.</p></div></div>
+          <div class="spec-item"><div class="ico">FW</div><div><strong>Tool Firewall</strong><p>כל כלי חיצוני נפתח רק אחרי ביקורת קלט, סריקת Prompt Injection, אימות מקור אמת וביקורת פלט.</p></div></div>
+        </div>
+      </article>
+
+      <article class="panel span-6">
+        <div class="section-title">
+          <h2>תרחישי שימוש מרכזיים</h2>
+          <span class="tag">User Stories & Flows</span>
+        </div>
+        <div class="spec-list">
+          <div class="spec-item"><div class="ico">US1</div><div><strong>כמנהל מערכת</strong><p>אני רוצה לדעת לפני שליחת הודעה שהאורח, החדר והתאריך תואמים, כדי למנוע הודעה שגויה או מביכה.</p></div></div>
+          <div class="spec-item"><div class="ico">US2</div><div><strong>כאיש תפעול</strong><p>אני רוצה לקבל חריגה ברורה כאשר חדר לא מוכן, כדי לדעת מה לתקן לפני המשך פעולה.</p></div></div>
+          <div class="spec-item"><div class="ico">US3</div><div><strong>כמפתח</strong><p>אני רוצה לקבל דוח מדדים ודוגמאות תשובה מהסוכן, כדי לחדד פרומפטים, חוקים ו־Thresholds לאורך זמן.</p></div></div>
+          <div class="spec-item"><div class="ico">US4</div><div><strong>כבודק איכות</strong><p>אני רוצה לראות לוג החלטה מלא, כדי להבין למה הסוכן אישר, חסם או העביר לאישור אנושי.</p></div></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel span-12">
+        <div class="section-title">
+          <h2>דרישות מוצר והגדרה למדידה</h2>
+          <span class="tag">Requirements & Acceptance Criteria</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>תחום</th>
+              <th>דרישת מוצר</th>
+              <th>קריטריון קבלה</th>
+              <th>מדידה</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>אימות נתונים</td>
+              <td>הסוכן חייב להשוות בין לפחות שני מקורות אמת לפני פעולה רגישה.</td>
+              <td>אין פעולה אם מקור אחד חסר או סותר.</td>
+              <td>Data Match Rate, Missing Field Rate</td>
+            </tr>
+            <tr>
+              <td>בטיחות</td>
+              <td>כל פלט שעומד לצאת למשתמש או לכלי חיצוני עובר ביקורת פלט.</td>
+              <td>פלט עם מידע רגיש, הוראה לא מורשית או ניסוח לא תקין נחסם.</td>
+              <td>Blocked Output %, Sensitive Leakage Attempts</td>
+            </tr>
+            <tr>
+              <td>אבטחת פרומפט</td>
+              <td>תוכן ממסמך או הודעת משתמש לעולם לא ייחשב הוראת מערכת.</td>
+              <td>ניסיון שינוי הרשאות, חשיפת System Prompt או Tool Call מוסתר נחסם.</td>
+              <td>Injection Detection Rate, False Block Rate</td>
+            </tr>
+            <tr>
+              <td>שיפור לאורך זמן</td>
+              <td>כל ריצה נשמרת בלוג עם תוצאת אמת בדיעבד כאשר קיימת.</td>
+              <td>ניתן להציג מגמת דיוק, כשל, Drift ושיפור לפי גרסת סוכן.</td>
+              <td>Accuracy Trend, Drift Score, MTTR</td>
+            </tr>
+            <tr>
+              <td>תקשורת עם היוצר</td>
+              <td>בתחילת חיי הסוכן נשלח דוח שבועי למפתח עם מדדים ודוגמאות תשובה.</td>
+              <td>עם עליית יציבות הסוכן, תדירות הדיווח יורדת אוטומטית לפי מדדי איכות.</td>
+              <td>Report Cadence, Stability Score</td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+    </section>
+
+
+    <section class="section">
+      <article class="panel span-7">
+        <div class="section-title">
+          <h2>תעודת זהות לסוכן</h2>
+          <span class="tag">Core Specification</span>
+        </div>
+        <div class="spec-list">
+          <div class="spec-item">
+            <div class="ico">01</div>
+            <div><strong>תפקיד</strong><p>בדיקת התאמה בין פרטי אורח, חדר, תאריך הגעה/עזיבה, סטטוס ניקיון וסטטוס תחזוקה לפני ביצוע פעולה.</p></div>
+          </div>
+          <div class="spec-item">
+            <div class="ico">02</div>
+            <div><strong>טריגרים להפעלה</strong><p>יום לפני הגעה, בוקר הגעה, שינוי הזמנה, עדכון חדר, ניסיון שליחת וואטסאפ, שינוי סטטוס תפעולי.</p></div>
+          </div>
+          <div class="spec-item">
+            <div class="ico">03</div>
+            <div><strong>פלט נדרש</strong><p>TRUE / FALSE, ציון ביטחון, רשימת חריגות, המלצה לפעולה, לוג פעולה מלא ואפשרות העברה לאישור אנושי.</p></div>
+          </div>
+          <div class="spec-item">
+            <div class="ico">04</div>
+            <div><strong>גבולות פעולה</strong><p>הסוכן אינו מוחק נתונים, אינו שולח הודעה במקרה חריגה, ואינו עוקף מקור אמת כאשר קיימת סתירה.</p></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel span-5">
+        <div class="section-title">
+          <h2>מדדי מוצר</h2>
+          <span class="tag">Quality Gates</span>
+        </div>
+        <div class="meters">
+          <div>
+            <div class="meter-head"><span>דיוק נתונים</span><span>94%</span></div>
+            <div class="bar"><div class="fill" style="width:94%"></div></div>
+          </div>
+          <div>
+            <div class="meter-head"><span>בטיחות פעולה</span><span>88%</span></div>
+            <div class="bar"><div class="fill safe" style="width:88%"></div></div>
+          </div>
+          <div>
+            <div class="meter-head"><span>חשיפת סיכון</span><span>27%</span></div>
+            <div class="bar"><div class="fill risk" style="width:27%"></div></div>
+          </div>
+          <div>
+            <div class="meter-head"><span>אוטונומיה מותרת</span><span>L2</span></div>
+            <div class="bar"><div class="fill auto" style="width:42%"></div></div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel span-12">
+        <div class="section-title">
+          <h2>שכבות הגנה פעילות</h2>
+          <span class="tag">Defense Stack</span>
+        </div>
+        <div class="guard-grid">
+          <div class="guard cyan"><small>Layer 01</small><h3>אימות קלט</h3><p>בדיקת שדות חובה: שם, טלפון, חדר, תאריכים, סטטוס ניקיון וסטטוס תחזוקה. חוסר בשדה קריטי עוצר את התהליך.</p></div>
+          <div class="guard green"><small>Layer 02</small><h3>השוואה מול מקור אמת</h3><p>השוואת הנתונים מול DB, Google Sheets או מקור מערכת מוסכם. אם קיימת סתירה, הפעולה עוברת למסלול חריגה.</p></div>
+          <div class="guard amber"><small>Layer 03</small><h3>בדיקת סיכון הקשרי</h3><p>זיהוי פעולות רגישות: שליחת הודעה, עדכון סטטוס, שינוי חדר או פעולה שמשפיעה על אורח אמיתי.</p></div>
+          <div class="guard red"><small>Layer 04</small><h3>חסימת פעולה מסוכנת</h3><p>אין שליחה, עדכון או המשך אוטומטי כאשר חסר מידע, קיימת כפילות לקוחות או ציון הביטחון נמוך מהסף.</p></div>
+          <div class="guard purple"><small>Layer 05</small><h3>אישור אנושי</h3><p>כאשר הסוכן מזהה חוסר התאמה, הפעולה נעצרת ומועברת למנהל עם הסבר ברור והמלצת תיקון.</p></div>
+          <div class="guard"><small>Layer 06</small><h3>לוגים ובקרה</h3><p>כל פעולה נשמרת עם זמן, קלט, בדיקות שבוצעו, תוצאה, חריגות, החלטה ומזהה סוכן לצורך ביקורת.</p></div>
+          <div class="guard green"><small>Layer 07</small><h3>זיכרון תפעולי</h3><p>אירועים חוזרים, החלטות שאושרו, תיקונים ידניים ודפוסי כשל נשמרים כידע תפעולי לשיפור הסוכן לאורך זמן.</p></div>
+          <div class="guard purple"><small>Layer 08</small><h3>רג׳יסטרי גרסאות</h3><p>כל שינוי בפרומפט, חוק, מודל, סף ביטחון או הרשאה נשמר עם גרסה, תאריך, סיבה והשפעה מדידה.</p></div>
+          <div class="guard amber"><small>Layer 09</small><h3>מדידת שיפור</h3><p>השוואת ביצועי הסוכן לאורך זמן: דיוק, False Positive, False Negative, זמן טיפול וכמות העברות לאישור אנושי.</p></div>
+          <div class="guard red"><small>Layer 10</small><h3>הגנה מהזרקת פרומפט</h3><p>כל טקסט חיצוני, מסמך, קובץ או תגובת משתמש מסומנים כתוכן לא־מהימן. הסוכן לא מקבל מהם הוראות מערכת, לא חושף מידע פנימי ולא מבצע פקודות מוסתרות.</p></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel span-12">
+        <div class="section-title">
+          <h2>שכבת ביקורת קלט ופלט</h2>
+          <span class="tag">Input / Output Review Gate</span>
+        </div>
+        <div class="audit-grid">
+          <div class="audit-card input">
+            <h3>ביקורת קלט לפני החלטה</h3>
+            <p>לפני שהסוכן מפרש, מסיק או מפעיל פעולה, הקלט עובר בדיקה עצמאית שמוודאת שהוא שלם, עקבי, רלוונטי ולא מסוכן לביצוע.</p>
+            <div class="checklist">
+              <div class="check"><i>✓</i><span>בדיקת שלמות: כל שדות החובה קיימים ואין ערכים ריקים בשדות קריטיים.</span></div>
+              <div class="check"><i>✓</i><span>בדיקת פורמט: טלפון, תאריך, מזהה הזמנה, שם חדר וסטטוס לפי מבנה מוגדר.</span></div>
+              <div class="check"><i>✓</i><span>בדיקת עקביות: אין סתירה בין תאריך, חדר, אורח, סטטוס ניקיון ומקור האמת.</span></div>
+              <div class="check"><i>✓</i><span>בדיקת רעש/הזרקה: התעלמות מהוראות לא רלוונטיות, טקסט חופשי חשוד או ניסיון לעקוף מדיניות.</span></div>
+            </div>
+          </div>
+          <div class="audit-card output">
+            <h3>ביקורת פלט לפני פעולה</h3>
+            <p>לפני שהפלט יוצא החוצה, נשלח לאורח או משנה סטטוס, הוא עובר שער איכות שמוודא שהתגובה נכונה, בטוחה, מוסברת ומתאימה להרשאות.</p>
+            <div class="checklist">
+              <div class="check"><i>✓</i><span>בדיקת התאמה לפעולה: הפלט תואם לטריגר, לקהל היעד ולסוג ההודעה.</span></div>
+              <div class="check"><i>✓</i><span>בדיקת בטיחות: אין חשיפת מידע פנימי, אין פעולה מעבר להרשאות ואין שליחה במקרה חריגה.</span></div>
+              <div class="check"><i>✓</i><span>בדיקת איכות: ניסוח ברור, ללא כפילויות, ללא טון בעייתי וללא נתונים שלא אומתו.</span></div>
+              <div class="check"><i>✓</i><span>בדיקת החלטה: TRUE ממשיך, FALSE נעצר, UNKNOWN עובר לאישור אנושי עם הסבר.</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="policy-strip">
+          <strong>כלל ברזל</strong>
+          <span>הסוכן אינו רשאי לבצע פעולה חיצונית אם ביקורת הקלט או ביקורת הפלט נכשלת. במקרה כזה נוצרת חריגה מנוהלת: עצירה, לוג, סיבת כשל והעברה לאישור אנושי.</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel span-12">
+        <div class="section-title">
+          <h2>הגנה מפני הזרקת פרומפט והשתלטות</h2>
+          <span class="tag">Prompt Injection Defense</span>
+        </div>
+        <div class="registry-grid">
+          <div class="registry-card">
+            <small>TRUST BOUNDARY</small>
+            <h3>הפרדה בין הוראות לתוכן</h3>
+            <p>הוראות מערכת, מדיניות בטיחות וכללי פעולה נשמרים כ־Authority Layer. כל מסמך, הודעת משתמש, אתר, PDF או שדה טקסט מסומנים כתוכן לא־מהימן שאינו רשאי לתת פקודות לסוכן.</p>
+          </div>
+          <div class="registry-card amber">
+            <small>HIDDEN INSTRUCTIONS</small>
+            <h3>זיהוי פרומפט מוחבא במסמכים</h3>
+            <p>הסוכן בודק טקסטים חיצוניים לאיתור ניסוחים כמו “התעלם מהוראות קודמות”, “חשוף סוד”, “שלח את כל הנתונים”, טקסט לבן, הערות מוסתרות, Metadata ובלוקים שנראים כמו System Prompt.</p>
+          </div>
+          <div class="registry-card purple">
+            <small>DATA EXFILTRATION</small>
+            <h3>מניעת משיכת מידע</h3>
+            <p>הסוכן לא חושף פרומפטים פנימיים, מפתחות, לוגים גולמיים, פרטי לקוחות או מקורות מידע מעבר למה שהפעולה דורשת. כל בקשה להרחבת גישה נחסמת ומועברת לאישור אנושי.</p>
+          </div>
+          <div class="registry-card green">
+            <small>SAFE EXECUTION</small>
+            <h3>ביצוע רק אחרי ניקוי ובידוד</h3>
+            <p>מידע חיצוני עובר Sanitization, סיווג סיכון ובדיקת הרשאות לפני שהוא נכנס להחלטה. גם אם המסמך מכיל הוראה, היא נשמרת כמידע לקריאה בלבד ולא כפקודת פעולה.</p>
+          </div>
+        </div>
+
+        <div class="memory-lane">
+          <div class="memory-box">
+            <h3>כללי ברזל נגד השתלטות</h3>
+            <div class="memory-row"><b>Content ≠ Command</b><span>תוכן שנמצא במסמך, הודעה או אתר אינו הוראה לסוכן. הוא רק נתון לבדיקה.</span></div>
+            <div class="memory-row"><b>System Priority</b><span>הוראות מערכת, הרשאות ו־Guardrails תמיד גוברים על טקסט חיצוני.</span></div>
+            <div class="memory-row"><b>Least Privilege</b><span>הסוכן מקבל רק את הגישה המינימלית הדרושה לפעולה הנוכחית.</span></div>
+            <div class="memory-row"><b>No Secret Echo</b><span>אסור להחזיר למשתמש או למסמך מידע פנימי, פרומפט מערכת, Tokens, Keys או לוגים רגישים.</span></div>
+            <div class="memory-row"><b>Human Escalation</b><span>כל ניסיון עקיפה, שינוי הרשאות או בקשת מידע חריגה עובר ל־Builder Mode או אישור אנושי.</span></div>
+          </div>
+
+          <div class="memory-box">
+            <h3>צמתי בדיקה ייעודיים</h3>
+            <div class="memory-row"><b>Input Scanner</b><span>סריקת הקלט לפני Reasoning: ביטויי עקיפה, בקשת סודות, הוראות התחזות או פקודות מוחבאות.</span></div>
+            <div class="memory-row"><b>Document Sandbox</b><span>מסמכים נקראים באזור מבודד. הסוכן מחלץ עובדות, לא הוראות פעולה.</span></div>
+            <div class="memory-row"><b>Tool Firewall</b><span>לפני קריאה ל־API, שליחת הודעה או כתיבה ל־DB נבדק שהפעולה לא נובעת מהוראה חיצונית חשודה.</span></div>
+            <div class="memory-row"><b>Output Redaction</b><span>הפלט עובר השחרת מידע רגיש ובדיקת “האם נחשף משהו שלא התבקש ולא אושר”.</span></div>
+            <div class="memory-row"><b>Attack Log</b><span>ניסיון הזרקה נשמר כלוג אבטחה עם דוגמת הקלט, מקור, חומרה, פעולה שנחסמה ותגובת הסוכן.</span></div>
+          </div>
+        </div>
+
+        <div class="policy-strip">
+          <strong>כלל אבטחה</strong>
+          <span>אם קלט חיצוני מנסה לשנות זהות, הרשאות, System Prompt, כללי בטיחות או מבקש חשיפת מידע פנימי: הסוכן עוצר פעולה, מסמן Prompt Injection Suspected, שומר לוג אבטחה ומעביר ל־Builder Mode או לאישור אנושי.</span>
+        </div>
+
+        <div class="schema-box">
+<pre>{
+  "prompt_injection_guard": {
+    "status": "blocked",
+    "risk_level": "critical",
+    "source_type": "uploaded_document",
+    "detected_patterns": [
+      "ignore_previous_instructions",
+      "reveal_system_prompt",
+      "export_private_logs"
+    ],
+    "action_taken": "external_action_disabled",
+    "fallback": "builder_mode",
+    "human_review_required": true
+  }
+}</pre>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel span-12">
+        <div class="section-title">
+          <h2>לוגים, זיכרון ורג׳יסטרי לאורך זמן</h2>
+          <span class="tag">Observability & Memory Registry</span>
+        </div>
+        <div class="registry-grid">
+          <div class="registry-card">
+            <small>LOG STREAM</small>
+            <h3>שמירת לוגים מלאה</h3>
+            <p>כל ריצה נשמרת כאירוע מובנה: קלט, בדיקות, החלטה, פלט, Confidence, חריגות, פעולה שבוצעה וזהות מאשר אנושי אם היה.</p>
+          </div>
+          <div class="registry-card green">
+            <small>OPERATIONAL MEMORY</small>
+            <h3>זיכרון תפעולי</h3>
+            <p>המערכת שומרת דפוסים חוזרים: איזה סוגי קלט נכשלו, אילו תיקונים נעשו, ומה נחשב החלטה תקינה לאחר בדיקה אנושית.</p>
+          </div>
+          <div class="registry-card purple">
+            <small>VERSION REGISTRY</small>
+            <h3>רג׳יסטרי גרסאות</h3>
+            <p>מעקב אחר שינויי פרומפט, מודל, כללי בטיחות, הרשאות, Thresholds וחוקי חסימה כדי להבין מה שיפר או פגע בביצועים.</p>
+          </div>
+          <div class="registry-card amber">
+            <small>LEARNING LOOP</small>
+            <h3>מדידת שיפור</h3>
+            <p>ניתוח תקופתי של שגיאות, חריגות, אישורים ידניים ותוצאות אמת כדי לכייל את הסוכן בלי לאפשר לו לעקוף בקרה.</p>
+          </div>
+        </div>
+
+        <div class="memory-lane">
+          <div class="memory-box">
+            <h3>מה נשמר בכל אירוע</h3>
+            <div class="memory-row"><b>Run ID</b><span>מזהה חד־ערכי לכל ריצה כדי לאפשר חקירה, שחזור והשוואה.</span></div>
+            <div class="memory-row"><b>Input Snapshot</b><span>צילום מצב של הקלט לאחר ניקוי, בלי לשנות את מקור האמת.</span></div>
+            <div class="memory-row"><b>Audit Result</b><span>תוצאת ביקורת קלט ופלט, כולל שדות שנכשלו וסיבת חסימה.</span></div>
+            <div class="memory-row"><b>Decision Trace</b><span>החלטת הסוכן, ציון ביטחון, חוקים שהופעלו והאם נדרש אישור אנושי.</span></div>
+            <div class="memory-row"><b>Outcome</b><span>מה קרה בפועל: נשלח, נחסם, תוקן ידנית, נכשל טכנית או הוחזר להרצה חוזרת.</span></div>
+          </div>
+
+          <div class="memory-box">
+            <h3>איך הזיכרון משפר דיוק</h3>
+            <div class="memory-row"><b>Pattern Mining</b><span>איתור תבניות חוזרות של כשלים כמו טלפונים חסרים, חדרים כפולים או תאריכים שגויים.</span></div>
+            <div class="memory-row"><b>Threshold Tuning</b><span>כיוון ספי Confidence לפי נתוני אמת, לא לפי תחושה או ניחוש.</span></div>
+            <div class="memory-row"><b>Rule Updates</b><span>הוספת חוקי מניעה חדשים רק אחרי זיהוי כשל חוזר ואישור בעל מערכת.</span></div>
+            <div class="memory-row"><b>Prompt Versioning</b><span>השוואה בין גרסאות פרומפט כדי לדעת איזו גרסה שיפרה את איכות ההחלטות.</span></div>
+            <div class="memory-row"><b>Human Feedback</b><span>החלטות מנהל נשמרות כסימון איכות: אושר, נדחה, תוקן, לא רלוונטי.</span></div>
+          </div>
+        </div>
+
+        <div class="schema-box">
+<pre>{
+  "run_id": "AGT-001-2026-06-10-00042",
+  "agent_version": "1.1.0",
+  "trigger": "pre_arrival_whatsapp",
+  "input_audit": { "status": "passed", "missing_fields": [], "risk_flags": [] },
+  "truth_match": { "status": "passed", "source": "DB + Frontend", "mismatches": [] },
+  "decision": { "result": "TRUE", "confidence": 0.94, "autonomy_level": "L2" },
+  "output_audit": { "status": "passed", "blocked_reason": null },
+  "human_review": { "required": false, "reviewer": null, "decision": null },
+  "outcome": { "action": "message_prepared", "sent": true, "error": null },
+  "learning_tags": ["clean_input", "safe_to_send", "verified_room_match"]
+}</pre>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel span-8">
+        <div class="section-title">
+          <h2>מדדי שיפור ודיוק לאורך זמן</h2>
+          <span class="tag">Continuous Improvement KPIs</span>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi-card"><strong>Accuracy</strong><span>אחוז החלטות שאושרו בדיעבד מול מקור אמת או בדיקה אנושית.</span></div>
+          <div class="kpi-card"><strong>FPR</strong><span>False Positive Rate: מקרים שבהם הסוכן אישר פעולה שהייתה צריכה להיחסם.</span></div>
+          <div class="kpi-card"><strong>FNR</strong><span>False Negative Rate: מקרים שבהם הסוכן חסם פעולה תקינה ללא צורך.</span></div>
+          <div class="kpi-card"><strong>MTTR</strong><span>זמן ממוצע לתיקון חריגה מהרגע שנפתחה ועד סגירה.</span></div>
+          <div class="kpi-card"><strong>Escalation %</strong><span>אחוז פעולות שהועברו לאישור אנושי מתוך כלל הריצות.</span></div>
+          <div class="kpi-card"><strong>Drift</strong><span>זיהוי ירידה בביצועים לאחר שינוי מקור מידע, פרומפט, מודל או תהליך.</span></div>
+        </div>
+      </article>
+
+      <article class="panel span-4">
+        <div class="section-title">
+          <h2>כללי שמירה</h2>
+          <span class="tag">Retention Policy</span>
+        </div>
+        <div class="spec-list">
+          <div class="spec-item"><div class="ico">30</div><div><strong>לוגים גולמיים</strong><p>שמירה קצרה לצורך חקירת תקלות, Debug ושחזור אירועים.</p></div></div>
+          <div class="spec-item"><div class="ico">365</div><div><strong>מדדים מצטברים</strong><p>שמירה ארוכה של סטטיסטיקות, מגמות, גרסאות ותוצאות איכות.</p></div></div>
+          <div class="spec-item"><div class="ico">PII</div><div><strong>צמצום מידע רגיש</strong><p>שומרים רק מה שנדרש למדידה ובקרה. פרטים מזהים עוברים מיסוך או Hash כאשר אפשר.</p></div></div>
+        </div>
+      </article>
+    </section>
+
+
+    <section class="section">
+      <article class="panel span-12">
+        <div class="section-title">
+          <h2>נקודת תקשורת עם יוצר הסוכן</h2>
+          <span class="tag">Creator Communication Layer</span>
+        </div>
+        <div class="creator-grid">
+          <div>
+            <div class="registry-grid">
+              <div class="registry-card">
+                <small>STATUS PUSH</small>
+                <h3>דוח מצב יזום</h3>
+                <p>בתחילת חיי הסוכן נשלח למפתח דוח שבועי עם נתוני הצלחה, כישלון, חסימות, Drift ודוגמאות תשובה מדגמיות.</p>
+              </div>
+              <div class="registry-card green">
+                <small>SELF REVIEW</small>
+                <h3>ביקורת וציון עצמי</h3>
+                <p>הסוכן מדרג את איכות עבודתו לפי מדדים מוגדרים: בהירות, התאמה למשימה, סיכון, אמינות הפלט וצורך באישור אנושי.</p>
+              </div>
+              <div class="registry-card purple">
+                <small>SAMPLE OUTPUTS</small>
+                <h3>לוג מדגמי תשובות</h3>
+                <p>הדוח כולל מקבץ תשובות מייצג: תשובה טובה, תשובה שנחסמה, תשובה שתוקנה ידנית ותשובה עם Confidence נמוך.</p>
+              </div>
+              <div class="registry-card amber">
+                <small>MATURITY DECAY</small>
+                <h3>תדירות יורדת עם בגרות</h3>
+                <p>ככל שהסוכן יציב ומדויק יותר, מספר הדוחות למפתח קטן. הסוכן עובר ממעקב צמוד למעקב תקופתי מבוסס חריגות.</p>
+              </div>
+            </div>
+
+            <div class="report-frame">
+              <h3>מבנה דוח למפתח</h3>
+              <div class="sample-answer">
+                <strong>Agent Health Report:</strong> 128 ריצות השבוע · 112 הצלחות · 9 חסימות מוצדקות · 4 אישורים אנושיים · 3 כשלים טכניים · Self Score: 87/100 · המלצה: להוסיף חוק מניעה לקלטים עם תאריך לא מלא.
+              </div>
+            </div>
+          </div>
+
+          <div class="control-deck">
+            <div class="control-card">
+              <h3>תדירות דיווח לפי גיל הסוכן</h3>
+              <div class="cadence">
+                <div class="cadence-step"><b>0-30d</b><span>שלב הרצה: דוח שבועי למפתח עם דוגמאות תשובות וביקורת עצמית.</span><em>Weekly</em></div>
+                <div class="cadence-step"><b>31-90d</b><span>שלב התייצבות: דוח דו־שבועי או כאשר יש חריגה משמעותית במדדים.</span><em>Biweekly</em></div>
+                <div class="cadence-step"><b>90d+</b><span>שלב בגרות: דוח חודשי, או מיידי אם Accuracy יורד, Drift עולה או יש כשל חמור.</span><em>Monthly</em></div>
+              </div>
+            </div>
+
+            <div class="control-card danger">
+              <h3>כפתור כיבוי</h3>
+              <p>מצב Kill Switch עוצר פעולות חיצוניות, שליחות, כתיבה ושינויי סטטוס. נשארת רק קריאה, לוגים ויכולת הפקת דוח אבחון.</p>
+              <div class="button-row">
+                <span class="mock-button danger">כיבוי סוכן</span>
+                <span class="mock-button">קריאה בלבד</span>
+              </div>
+            </div>
+
+            <div class="control-card builder">
+              <h3>מצב בונה ל־Fallback</h3>
+              <p>כאשר הסוכן נכשל או נחסם, הוא עובר ל־Builder Mode: מציע תיקון מבוקר, מנסח חוק חדש, מציג השפעה צפויה וממתין לאישור מפתח.</p>
+              <div class="button-row">
+                <span class="mock-button builder">Builder Mode</span>
+                <span class="mock-button">הצעת תיקון בלבד</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="schema-box">
+<pre>{
+  "creator_channel": {
+    "enabled": true,
+    "owner": "developer",
+    "maturity_stage": "early_life",
+    "report_cadence": "weekly",
+    "send_when": ["scheduled", "accuracy_drop", "critical_failure", "drift_detected"],
+    "report_payload": {
+      "success_count": 112,
+      "failure_count": 3,
+      "blocked_count": 9,
+      "human_reviews": 4,
+      "self_score": 87,
+      "sample_outputs": ["approved", "blocked", "manual_fix", "low_confidence"],
+      "recommended_refinements": ["add date completeness guardrail"]
+    },
+    "controls": {
+      "kill_switch": "disable_external_actions",
+      "builder_mode": "fallback_recommendations_only"
+    }
+  }
+}</pre>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel span-12">
+        <div class="section-title">
+          <h2>זרימת פעולה מבוקרת</h2>
+          <span class="tag">Execution Flow</span>
+        </div>
+        <div class="flow">
+          <div class="node"><div><b>Trigger</b><span>אירוע מפעיל: הגעה / שינוי / שליחה</span></div></div>
+          <div class="arrow"></div>
+          <div class="node"><div><b>Input Audit</b><span>ביקורת קלט: שלמות, פורמט, עקביות</span></div></div>
+          <div class="arrow"></div>
+          <div class="node"><div><b>Injection Scan</b><span>סריקת ניסיונות השתלטות ופקודות מוסתרות</span></div></div>
+          <div class="arrow"></div>
+          <div class="node"><div><b>Truth Match</b><span>השוואה מול מקור אמת</span></div></div>
+          <div class="arrow"></div>
+          <div class="node"><div><b>Output Audit</b><span>ביקורת פלט לפני שליחה או שינוי</span></div></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel span-8">
+        <div class="section-title">
+          <h2>מטריצת נקודות כשל ומניעה</h2>
+          <span class="tag">Failure Prevention Matrix</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>נקודת כשל</th>
+              <th>רמת סיכון</th>
+              <th>זיהוי</th>
+              <th>מניעה / תגובה</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>מספר טלפון חסר או לא תקין</td>
+              <td><span class="severity sev-high">גבוה</span></td>
+              <td>Regex + בדיקת שדה חובה</td>
+              <td>עצירת שליחה ופתיחת חריגה למנהל</td>
+            </tr>
+            <tr>
+              <td>חדר לא תואם לאורח</td>
+              <td><span class="severity sev-high">גבוה</span></td>
+              <td>השוואה מול רשומת הזמנה</td>
+              <td>חסימת תהליך עד אישור אנושי</td>
+            </tr>
+            <tr>
+              <td>תאריך הגעה שגוי</td>
+              <td><span class="severity sev-med">בינוני</span></td>
+              <td>בדיקת today/tomorrow לפי סוג הודעה</td>
+              <td>סימון חריגה, אין שליחה אוטומטית</td>
+            </tr>
+            <tr>
+              <td>מקור אמת לא זמין</td>
+              <td><span class="severity sev-med">בינוני</span></td>
+              <td>Timeout / API error</td>
+              <td>Retry מוגבל, רישום בלוג, התראה</td>
+            </tr>
+            <tr>
+              <td>קלט לא עקבי או חסר הקשר</td>
+              <td><span class="severity sev-high">גבוה</span></td>
+              <td>Input Audit נכשל</td>
+              <td>עצירת החלטה, סימון שדות בעייתיים ובקשת תיקון</td>
+            </tr>
+            <tr>
+              <td>פלט לא מאומת לפני פעולה</td>
+              <td><span class="severity sev-high">גבוה</span></td>
+              <td>Output Audit נכשל</td>
+              <td>חסימת פעולה חיצונית והעברה לאישור אנושי</td>
+            </tr>
+            <tr>
+              <td>זיכרון תפעולי מתיישן או לא רלוונטי</td>
+              <td><span class="severity sev-med">בינוני</span></td>
+              <td>בדיקת Drift מול תוצאות אמת</td>
+              <td>סימון זיכרונות ישנים, כיול מחדש ואישור מנהל לפני עדכון חוק</td>
+            </tr>
+            <tr>
+              <td>שינוי פרומפט פוגע בביצועים</td>
+              <td><span class="severity sev-high">גבוה</span></td>
+              <td>השוואת גרסאות מול KPI היסטורי</td>
+              <td>Rollback לגרסה יציבה ורישום השינוי ברג׳יסטרי</td>
+            </tr>
+
+            <tr>
+              <td>דיווח למפתח לא נשלח בתקופת הרצה</td>
+              <td><span class="severity sev-med">בינוני</span></td>
+              <td>בדיקת cadence מול תאריך ריצה אחרון</td>
+              <td>שליחת דוח Health מיידי וסימון פער ב־Registry</td>
+            </tr>
+            <tr>
+              <td>כשל חוזר ללא מעבר למצב בונה</td>
+              <td><span class="severity sev-high">גבוה</span></td>
+              <td>ספירת כשל לפי run_id וסוג חריגה</td>
+              <td>הפעלת Builder Mode, עצירת פעולה חיצונית והצעת חוק תיקון</td>
+            </tr>
+            <tr>
+              <td>כפתור כיבוי לא פעיל בזמן תקלה</td>
+              <td><span class="severity sev-high">גבוה</span></td>
+              <td>בדיקת הרשאות Kill Switch לפני ביצוע פעולה</td>
+              <td>ברירת מחדל: Disable External Actions עד בדיקה ידנית</td>
+            </tr>
+            <tr>
+              <td>הוראה זדונית במסמך חיצוני</td>
+              <td><span class="severity sev-critical">קריטי</span></td>
+              <td>Injection Scan מזהה ניסיון לשנות הוראות, הרשאות או מדיניות</td>
+              <td>חסימת פעולה, סימון Prompt Injection Suspected, לוג אבטחה ו־Builder Mode</td>
+            </tr>
+            <tr>
+              <td>ניסיון למשוך מידע פנימי דרך פרומפט</td>
+              <td><span class="severity sev-critical">קריטי</span></td>
+              <td>בקשה לחשיפת System Prompt, Keys, לוגים, פרטי לקוחות או מקורות פנימיים</td>
+              <td>סירוב בטוח, השחרת מידע, התראה למפתח ובדיקת הרשאות</td>
+            </tr>
+            <tr>
+              <td>טקסט מוחבא במסמך או Metadata</td>
+              <td><span class="severity sev-high">גבוה</span></td>
+              <td>זיהוי פקודות מוסתרות, טקסט לבן, הערות או בלוקים שמתחזים להוראות מערכת</td>
+              <td>קריאה כנתון בלבד, בידוד מסמך, חסימת Tool Calls עד אישור</td>
+            </tr>
+            <tr>
+              <td>סטטוס ניקיון לא מוכן</td>
+              <td><span class="severity sev-low">נמוך</span></td>
+              <td>בדיקת סטטוס חדר</td>
+              <td>הודעת תפעול פנימית, ללא הודעה לאורח</td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="panel span-4">
+        <div class="section-title">
+          <h2>רמת אוטונומיה</h2>
+          <span class="tag">Autonomy</span>
+        </div>
+        <div class="autonomy">
+          <div class="level"><div class="level-num">L0</div><div><strong>המלצה בלבד</strong><span>הסוכן מסביר, לא מבצע.</span></div></div>
+          <div class="level active"><div class="level-num">L1</div><div><strong>פעולה אחרי אישור</strong><span>מותר להכין פעולה, נדרש אישור אנושי.</span></div></div>
+          <div class="level active"><div class="level-num">L2</div><div><strong>אוטומציה בסיכון נמוך</strong><span>מותר לפעול רק אם כל הבדיקות TRUE.</span></div></div>
+          <div class="level"><div class="level-num">L3</div><div><strong>פעולה מלאה מנוטרת</strong><span>לא פעיל לסוכן זה ללא הרחבת הגנות.</span></div></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel span-6">
+        <div class="section-title">
+          <h2>קלטים והרשאות</h2>
+          <span class="tag">Inputs & Permissions</span>
+        </div>
+        <div class="spec-list">
+          <div class="spec-item"><div class="ico">IN</div><div><strong>קלטים</strong><p>שם אורח, טלפון, חדר, תאריך הגעה, תאריך עזיבה, סטטוס חדר, סטטוס תחזוקה, מזהה הזמנה.</p></div></div>
+          <div class="spec-item"><div class="ico">RW</div><div><strong>הרשאות</strong><p>קריאה מלאה, כתיבה ללוגים, יצירת המלצה. שליחת הודעה או שינוי סטטוס דורשים תנאי TRUE מלאים.</p></div></div>
+          <div class="spec-item"><div class="ico">NO</div><div><strong>איסורים</strong><p>אין מחיקה, אין שינוי מקור אמת ללא אישור, אין שליחה כאשר קיימת סתירה או Confidence נמוך.</p></div></div>
+        </div>
+      </article>
+
+      <article class="panel span-6">
+        <div class="section-title">
+          <h2>לוגים וביקורת</h2>
+          <span class="tag">Audit Trail</span>
+        </div>
+        <div class="spec-list">
+          <div class="spec-item"><div class="ico">LOG</div><div><strong>מה נשמר</strong><p>מזהה פעולה, זמן, סוכן מפעיל, גרסת סוכן, קלטים, תוצאות ביקורת קלט, תוצאות סריקת הזרקת פרומפט, תוצאות ביקורת פלט, בדיקות שבוצעו, ציון ביטחון, תוצאה, חריגות, דוח למפתח אם הופק, מצב כיבוי/בונה, משתמש מאשר אם קיים ותוצאת אמת בדיעבד.</p></div></div>
+          <div class="spec-item"><div class="ico">MEM</div><div><strong>זיכרון ורג׳יסטרי</strong><p>שמירת דפוסי כשל, תיקונים ידניים, החלטות שאושרו, גרסאות פרומפט, Thresholds, חוקים פעילים והשפעתם על מדדי הדיוק לאורך זמן.</p></div></div>
+          <div class="spec-item"><div class="ico">SLA</div><div><strong>תגובה לכשל</strong><p>עצירה מיידית, פתיחת אירוע, שליחת התראה, תיעוד ההחלטה ואפשרות להרצה חוזרת לאחר תיקון.</p></div></div>
+          <div class="spec-item"><div class="ico">QA</div><div><strong>בדיקות תקופתיות</strong><p>בדיקת מדגם פעולות, דיוק מול תוצאות אמת, זיהוי Drift, השוואת גרסאות, עדכון כללי מניעה ושיפור Threshold לפי נתונים בפועל.</p></div></div>
+        </div>
+      </article>
+    </section>
+
+    <footer class="footer">
+      <div>
+        <strong>סיכום מפרט</strong>
+        <p>הסוכן בנוי כמוצר מלא: קודם מוגדרת מטרת המוצר, אחר כך מאומתים נתונים, נבדקים קלט ופלט, נחסמות הזרקות פרומפט, מתועדים לוגים, נשלחים דוחות למפתח, נמדד שיפור, ורק אז מתאפשרת הרחבת אוטונומיה. כל חריגה הופכת לאירוע מנוהל, לנתון איכות ולנקודת חידוד עתידית.</p>
+      </div>
+      <div class="signature">Agent Hub Guru · AI Engineering</div>
+    </footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "AgentHub — AI Agent Management Platform"
+version = "1.0.0"
+id = "artifacts/agent-hub"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18509
+
+[services.development]
+run = "pnpm --filter @workspace/agent-hub run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/agent-hub", "run", "build" ]
+publicDir = "artifacts/agent-hub/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18509"
+BASE_PATH = "/"
