@@ -6,7 +6,7 @@
  * NO writes of any kind — pure read + compare.
  */
 
-import { ReplitConnectors } from "@replit/connectors-sdk";
+import crypto from "node:crypto";
 import type { PalgatePermit } from "@workspace/db";
 
 export interface SheetRow {
@@ -76,22 +76,85 @@ function extractSheetId(urlOrId: string): string {
   return m ? m[1] : urlOrId;
 }
 
+// ── Google auth (Service Account JWT, no extra deps) ──────────────────────────
+function b64url(input: Buffer | string): string {
+  return Buffer.from(input).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function getAccessToken(saJson: string): Promise<string> {
+  const sa = JSON.parse(saJson) as { client_email: string; private_key: string };
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claim = b64url(JSON.stringify({
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now, exp: now + 3600,
+  }));
+  const signer = crypto.createSign("RSA-SHA256");
+  signer.update(`${header}.${claim}`); signer.end();
+  const sig = b64url(signer.sign(sa.private_key));
+  const jwt = `${header}.${claim}.${sig}`;
+  const resp = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+  const j = await resp.json() as { access_token?: string; error?: string; error_description?: string };
+  if (!j.access_token) throw new Error(`google auth failed: ${j.error_description || j.error || "unknown"}`);
+  return j.access_token;
+}
+
+// Minimal CSV parser (handles quotes, commas, newlines)
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = []; let row: string[] = []; let cur = ""; let q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+      else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === ",") { row.push(cur); cur = ""; }
+    else if (c === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; }
+    else if (c !== "\r") cur += c;
+  }
+  if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+  return rows;
+}
+
+async function fetchValues(sheetId: string, sheetName: string | undefined, range: string): Promise<string[][]> {
+  const sa = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (sa) {
+    // Secure path: Sheets API v4 via Service Account
+    const token = await getAccessToken(sa);
+    const rangeParam = sheetName ? `${sheetName}!${range}` : range;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeParam)}`;
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) throw new Error(`sheets api ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    const json = await r.json() as { values?: string[][] };
+    return json.values ?? [];
+  }
+  // Fallback: public CSV (requires sheet shared "anyone with link: viewer")
+  const tab = sheetName ? `&sheet=${encodeURIComponent(sheetName)}` : "";
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${tab}`;
+  const r = await fetch(url, { redirect: "follow" });
+  if (!r.ok) throw new Error(`gviz csv ${r.status} — ודא שהגיליון משותף לצפייה או הגדר GOOGLE_SERVICE_ACCOUNT_JSON`);
+  const text = await r.text();
+  if (text.trim().startsWith("<")) throw new Error("הגיליון אינו ציבורי — שתף לצפייה-בקישור או הגדר Service Account");
+  return parseCsv(text);
+}
+
 export async function readSheet(sheetUrlOrId: string, sheetName?: string, range = "A1:Z1000"): Promise<SheetData> {
   const sheetId = extractSheetId(sheetUrlOrId);
-  const connectors = new ReplitConnectors();
-  const rangeParam = sheetName ? `${sheetName}!${range}` : range;
+  const values = await fetchValues(sheetId, sheetName, range);
 
-  const response = await connectors.proxy(
-    "google-sheet",
-    `/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeParam)}`,
-    { method: "GET" },
-  );
-
-  const json = await response.json() as { values?: string[][] };
-
-  if (!json.values || json.values.length === 0) {
+  if (!values || values.length === 0) {
     return { headers: [], rows: [], fetchedAt: new Date().toISOString(), sheetId };
   }
+  const json = { values };
 
   const [headerRow, ...dataRows] = json.values;
   const headers = headerRow.map((h) => String(h).trim());
