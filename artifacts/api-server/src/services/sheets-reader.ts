@@ -567,8 +567,8 @@ export function buildDailyReport(
   let arrivalsToday:   SheetRow[];
   let departuresToday: SheetRow[];
 
-  const ARRIVAL_TYPES   = new Set(["arrival", "check-in", "checkin", "swap", "report-arrival"]);
-  const DEPARTURE_TYPES = new Set(["departure", "check-out", "checkout"]);
+  const ARRIVAL_TYPES   = new Set(["arrival", "check-in", "checkin", "swap", "report-arrival", "booking"]);
+  const DEPARTURE_TYPES = new Set(["departure", "check-out", "checkout", "report-departure"]);
 
   if (dateCol && eventTypeCol) {
     arrivalsToday   = data.rows.filter(r =>
