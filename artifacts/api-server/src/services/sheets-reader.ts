@@ -517,9 +517,10 @@ export function buildDailyReport(
   const [y, mo, d] = todayISO.split("-");
   const todayDisplay = `${d}.${mo}.${y}`;
 
-  // Detect columns — based on actual "Turnovers" sheet schema
-  const unitCol        = findCol(data.headers, [...UNIT_COLS, "room"]);
-  const dateCol        = findCol(data.headers, ["date", "תאריך"]);          // event date
+  // Detect columns — Beit Williams Turnovers format (Google Sheets CSV with empty columns)
+  // Fixed positions: room=col 2, date=col 3, eventType=col 19
+  const unitCol        = findCol(data.headers, [...UNIT_COLS, "room"]) || (data.rows.length > 0 ? "room" : undefined);
+  const dateCol        = findCol(data.headers, ["date", "תאריך"]) || (data.rows.length > 0 && data.rows[0][2] ? (Object.keys(data.rows[0])[2] || undefined) : undefined);
   const eventTypeCol   = findCol(data.headers, ["eventType", "eventtype", "event_type", "type"]);
   const arrivalCol     = findCol(data.headers, ["arrivalDate", "arrivaldate", "arrival_date", ...CHECKIN_COLS]);
   const departureCol   = findCol(data.headers, ["departureDate", "departuredate", "departure_date", ...CHECKOUT_COLS]);
