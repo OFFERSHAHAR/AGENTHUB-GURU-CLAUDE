@@ -105,6 +105,17 @@ async function persistRecipientChatId(key: string, chatId: string): Promise<void
     });
 }
 
+// Identify which manager is acting in this chat — maps a configured recipient
+// chat (אור / עופר) to their label, else falls back to the Telegram name.
+async function resolveCreatorName(chatId: string, message: { from?: { first_name?: string; last_name?: string; username?: string } }): Promise<string> {
+  for (const r of RECIPIENTS) {
+    const id = await getRecipientChatId(r);
+    if (id && String(id) === chatId) return r.label;
+  }
+  return [message?.from?.first_name, message?.from?.last_name].filter(Boolean).join(" ")
+    || message?.from?.username || "מנהל";
+}
+
 // Snapshot of the AgentHub database for grounded answers about the hub itself
 // (how many agents/workflows/triggers/clients exist, and which). Read-only.
 async function buildHubFacts(): Promise<string> {
@@ -707,6 +718,13 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
           // Build a unique placeholder email so the NOT NULL constraint is satisfied
           const placeholderEmail = `telegram-${chatId}-${Date.now()}@agenthub.draft`;
 
+          // Attribute the spec to the manager who created it (אור / עופר / שם טלגרם)
+          const creator = await resolveCreatorName(chatId, message);
+          const baseNote = parsed.reasoning
+            ? `המלצת סוכן: ID ${parsed.recommendedAgentId ?? "?"} — ${parsed.reasoning.slice(0, 200)}`
+            : "נוצר מסוכן האיפיון בטלגרם";
+          const noteWithOwner = `ממתין לביצוע · נוצר ע"י ${creator}. ${baseNote}`;
+
           // Upsert by telegramChatId — avoid duplicate drafts per chat
           const [existingDraft] = await db
             .select({ id: clientsTable.id })
@@ -718,10 +736,9 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
             await db.update(clientsTable).set({
               name: draftName,
               rawSpec: specJson ?? stripHumanSpec(reply),
-              analysisStatus: "spec_draft",
-              notes: parsed.reasoning
-                ? `המלצת סוכן: ID ${parsed.recommendedAgentId ?? "?"} — ${parsed.reasoning.slice(0, 200)}`
-                : "נוצר מסוכן האיפיון בטלגרם",
+              analysisStatus: "pending_execution",
+              ownerUser: creator,
+              notes: noteWithOwner,
             }).where(eq(clientsTable.id, existingDraft.id));
           } else {
             await db.insert(clientsTable).values({
@@ -732,11 +749,10 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
               source: "telegram-spec",
               tier: "free",
               rawSpec: specJson ?? stripHumanSpec(reply),
-              analysisStatus: "spec_draft",
+              analysisStatus: "pending_execution",
+              ownerUser: creator,
               telegramChatId: chatId,
-              notes: parsed.reasoning
-                ? `המלצת סוכן: ID ${parsed.recommendedAgentId ?? "?"} — ${parsed.reasoning.slice(0, 200)}`
-                : "נוצר מסוכן האיפיון בטלגרם",
+              notes: noteWithOwner,
             });
           }
         } catch (err) {
@@ -751,10 +767,12 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
           .replace(/<<<SPEC_OUTPUT_START>>>[\s\S]*?<<<SPEC_OUTPUT_END>>>/, "")
           .replace(/\n\{[\s\S]*?\}\s*<<<SPEC_OUTPUT_END>>>/, "")
           .trim();
+        const specCreator = await resolveCreatorName(chatId, message);
         const finalText =
           (cleanReply ? cleanReply + "\n\n" : "") +
-          "✅ <b>האיפיון נשמר ב-AgentHub!</b>\n" +
-          "תוכל לראות את הטיוטה בעמוד הלקוחות.";
+          "✅ <b>האיפיון נותח ונשמר ב-AgentHub!</b>\n" +
+          `🗂️ לקוח חדש <b>ממתין לביצוע</b> · משויך ל-${specCreator}.\n` +
+          "תוכל לראות אותו בעמוד הלקוחות.";
         await sendLongMessage(chatId, finalText, REMOVE_KEYBOARD);
       } else {
         // On the first real reply — dismiss the domain keyboard; long question-set is ok to split
