@@ -684,10 +684,14 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
         sysPrompt,
         history,
       );
-      if (r.content && r.content !== "__TEMPLATE__") reply = r.content;
+      if (r.content && r.content !== "__TEMPLATE__") {
+        reply = r.content;
+      } else if (r.content === "__TEMPLATE__") {
+        reply = "🤖 מצטער, השירות זמנית לא זמין. אנא נסה שוב.";
+      }
     } catch (e) {
       console.error("[telegram/chat model]", e instanceof Error ? e.message : e);
-      if (!reply) reply = "⚠️ שגיאה זמנית. נסה שוב בעוד רגע.";
+      if (!reply) reply = "⚠️ שגיאה זמנית בעיבוד. נסה שוב בעוד רגע.";
     }
 
     history.push({ role: "assistant", content: reply });
