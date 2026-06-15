@@ -36,7 +36,12 @@ const chatSessions = new Map<string, Array<{ role: "user" | "assistant"; content
 const CHAT_MAX_TURNS = 20; // keep last N turns per chat to avoid unbounded growth
 // clientContextSessions: active client for /לקוח context
 const clientContextSessions = new Map<string, { id: number; name: string }>();
+// userMessageLog: last raw (non-command) messages a user wrote per chat — used by
+// "/שלח לאור" to forward "everything I wrote" to Or.
+const userMessageLog = new Map<string, string[]>();
+const USER_LOG_MAX = 30;
 const WEBHOOK_SECRET_KEY = "telegram_webhook_secret";
+const OR_CHAT_ID_KEY = "or_chat_id";
 
 function getBotToken(): string | null {
   return process.env.TELEGRAM_BOT_TOKEN || null;
@@ -67,6 +72,29 @@ async function persistWebhookSecret(secret: string): Promise<void> {
     .onConflictDoUpdate({
       target: settingsTable.key,
       set: { value: secret, updatedAt: new Date() },
+    });
+}
+
+// Resolve Or's destination chat: persisted setting first, then env fallbacks.
+async function getOrChatId(): Promise<string | null> {
+  const [row] = await db
+    .select({ value: settingsTable.value })
+    .from(settingsTable)
+    .where(eq(settingsTable.key, OR_CHAT_ID_KEY))
+    .limit(1);
+  return row?.value
+    ?? process.env.ADMIN_TELEGRAM_CHAT_ID
+    ?? process.env.TELEGRAM_CHAT_ID
+    ?? null;
+}
+
+async function persistOrChatId(chatId: string): Promise<void> {
+  await db
+    .insert(settingsTable)
+    .values({ key: OR_CHAT_ID_KEY, value: chatId })
+    .onConflictDoUpdate({
+      target: settingsTable.key,
+      set: { value: chatId, updatedAt: new Date() },
     });
 }
 
@@ -239,6 +267,74 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
     const chatId = String(message.chat.id);
     const text = message.text.trim();
     const messageId = String(message.message_id);
+
+    // Record raw, non-command messages so "/שלח לאור" can forward what the user wrote.
+    if (!text.startsWith("/")) {
+      const log = userMessageLog.get(chatId) ?? [];
+      log.push(text);
+      if (log.length > USER_LOG_MAX) log.splice(0, log.length - USER_LOG_MAX);
+      userMessageLog.set(chatId, log);
+    }
+
+    // /שלח לאור — forward what the user wrote to Or's chat.
+    //   "/שלח לאור הגדר <chat_id>" → set Or's destination chat once.
+    //   "/שלח לאור <טקסט>"          → send that text to Or.
+    //   "/שלח לאור"  (ריק)          → forward the user's recent messages.
+    if (text.startsWith("/שלח לאור") || text.toLowerCase().startsWith("/sendor")) {
+      const rest = text.replace(/^\/שלח לאור\s*/u, "").replace(/^\/sendor\s*/i, "").trim();
+
+      const setMatch = rest.match(/^(?:הגדר|set)\s+(-?\d{4,})$/i);
+      if (setMatch) {
+        await persistOrChatId(setMatch[1]);
+        await sendTelegramMessage(chatId, `✅ הצ'אט של אור הוגדר (chat ID <code>${setMatch[1]}</code>). מעכשיו <code>/שלח לאור</code> יעביר אליו.`);
+        res.json({ ok: true });
+        return;
+      }
+
+      const orChatId = await getOrChatId();
+      if (!orChatId) {
+        await sendTelegramMessage(chatId,
+          "⚠️ עדיין לא הוגדר הצ'אט של אור.\n\n" +
+          "כדי להגדיר פעם אחת:\n" +
+          "1. בקש מאור לשלוח <code>/start</code> לבוט הזה.\n" +
+          "2. אור ישלח <code>/whoami</code> ויקבל את ה-chat ID שלו.\n" +
+          "3. שלח כאן: <code>/שלח לאור הגדר [chat_id]</code>");
+        res.json({ ok: true });
+        return;
+      }
+
+      if (String(orChatId) === chatId) {
+        await sendTelegramMessage(chatId, "ℹ️ אתה כבר אור — אין למי להעביר.");
+        res.json({ ok: true });
+        return;
+      }
+
+      const senderName = [message.from?.first_name, message.from?.last_name]
+        .filter(Boolean).join(" ") || message.from?.username || "משתמש";
+
+      let payload = rest;
+      if (!payload) {
+        const mine = userMessageLog.get(chatId) ?? [];
+        payload = mine.length ? mine.join("\n") : "";
+      }
+      if (!payload) {
+        await sendTelegramMessage(chatId, "אין מה לשלוח — כתוב טקסט אחרי הפקודה, או שלח קודם הודעות.");
+        res.json({ ok: true });
+        return;
+      }
+
+      await sendTelegramMessage(orChatId, `📨 <b>הודעה מ-${senderName}:</b>\n\n${payload}`);
+      await sendTelegramMessage(chatId, "✅ נשלח לאור.");
+      res.json({ ok: true });
+      return;
+    }
+
+    // /whoami — reply with this chat's ID (used to configure Or's destination)
+    if (text.toLowerCase() === "/whoami" || text === "/מי") {
+      await sendTelegramMessage(chatId, `🆔 ה-chat ID שלך: <code>${chatId}</code>`);
+      res.json({ ok: true });
+      return;
+    }
 
     // /start
     if (text.startsWith("/start")) {
