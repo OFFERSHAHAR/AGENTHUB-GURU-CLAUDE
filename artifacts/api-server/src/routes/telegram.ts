@@ -41,7 +41,13 @@ const clientContextSessions = new Map<string, { id: number; name: string }>();
 const userMessageLog = new Map<string, string[]>();
 const USER_LOG_MAX = 30;
 const WEBHOOK_SECRET_KEY = "telegram_webhook_secret";
-const OR_CHAT_ID_KEY = "or_chat_id";
+
+// Managers the bot can forward messages to via "/שלח ל<שם>".
+interface SendRecipient { aliases: string[]; key: string; label: string; envFallbacks: string[]; }
+const RECIPIENTS: SendRecipient[] = [
+  { aliases: ["אור"],         key: "or_chat_id",   label: "אור",  envFallbacks: ["ADMIN_TELEGRAM_CHAT_ID", "TELEGRAM_CHAT_ID"] },
+  { aliases: ["עופר", "עפר"], key: "ofer_chat_id", label: "עופר", envFallbacks: [] },
+];
 
 function getBotToken(): string | null {
   return process.env.TELEGRAM_BOT_TOKEN || null;
@@ -75,23 +81,24 @@ async function persistWebhookSecret(secret: string): Promise<void> {
     });
 }
 
-// Resolve Or's destination chat: persisted setting first, then env fallbacks.
-async function getOrChatId(): Promise<string | null> {
+// Resolve a recipient's destination chat: persisted setting first, then env fallbacks.
+async function getRecipientChatId(r: SendRecipient): Promise<string | null> {
   const [row] = await db
     .select({ value: settingsTable.value })
     .from(settingsTable)
-    .where(eq(settingsTable.key, OR_CHAT_ID_KEY))
+    .where(eq(settingsTable.key, r.key))
     .limit(1);
-  return row?.value
-    ?? process.env.ADMIN_TELEGRAM_CHAT_ID
-    ?? process.env.TELEGRAM_CHAT_ID
-    ?? null;
+  if (row?.value) return row.value;
+  for (const env of r.envFallbacks) {
+    if (process.env[env]) return process.env[env]!;
+  }
+  return null;
 }
 
-async function persistOrChatId(chatId: string): Promise<void> {
+async function persistRecipientChatId(key: string, chatId: string): Promise<void> {
   await db
     .insert(settingsTable)
-    .values({ key: OR_CHAT_ID_KEY, value: chatId })
+    .values({ key, value: chatId })
     .onConflictDoUpdate({
       target: settingsTable.key,
       set: { value: chatId, updatedAt: new Date() },
@@ -276,35 +283,44 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
       userMessageLog.set(chatId, log);
     }
 
-    // /שלח לאור — forward what the user wrote to Or's chat.
-    //   "/שלח לאור הגדר <chat_id>" → set Or's destination chat once.
-    //   "/שלח לאור <טקסט>"          → send that text to Or.
+    // /שלח ל<נמען> — forward what the user wrote to a manager's chat (אור / עופר).
+    //   "/שלח לאור הגדר <chat_id>" → set that manager's destination chat once.
+    //   "/שלח לעופר <טקסט>"         → send that text to the manager.
     //   "/שלח לאור"  (ריק)          → forward the user's recent messages.
-    if (text.startsWith("/שלח לאור") || text.toLowerCase().startsWith("/sendor")) {
-      const rest = text.replace(/^\/שלח לאור\s*/u, "").replace(/^\/sendor\s*/i, "").trim();
+    const sendMatch = text.match(/^\/שלח\s+ל(\S+)/u)
+      ?? (text.toLowerCase().startsWith("/sendor") ? ([, "אור"] as RegExpMatchArray) : null);
+    if (sendMatch) {
+      const recipient = RECIPIENTS.find(r => r.aliases.includes(sendMatch[1]));
+      if (!recipient) {
+        await sendTelegramMessage(chatId,
+          `לא מזוהה נמען "<b>${sendMatch[1]}</b>". נמענים זמינים: ${RECIPIENTS.map(r => r.label).join(", ")}.`);
+        res.json({ ok: true });
+        return;
+      }
+      const rest = text.replace(/^\/שלח\s+ל\S+\s*/u, "").replace(/^\/sendor\s*/i, "").trim();
 
       const setMatch = rest.match(/^(?:הגדר|set)\s+(-?\d{4,})$/i);
       if (setMatch) {
-        await persistOrChatId(setMatch[1]);
-        await sendTelegramMessage(chatId, `✅ הצ'אט של אור הוגדר (chat ID <code>${setMatch[1]}</code>). מעכשיו <code>/שלח לאור</code> יעביר אליו.`);
+        await persistRecipientChatId(recipient.key, setMatch[1]);
+        await sendTelegramMessage(chatId, `✅ הצ'אט של ${recipient.label} הוגדר (chat ID <code>${setMatch[1]}</code>). מעכשיו <code>/שלח ל${recipient.label}</code> יעביר אליו.`);
         res.json({ ok: true });
         return;
       }
 
-      const orChatId = await getOrChatId();
-      if (!orChatId) {
+      const destChatId = await getRecipientChatId(recipient);
+      if (!destChatId) {
         await sendTelegramMessage(chatId,
-          "⚠️ עדיין לא הוגדר הצ'אט של אור.\n\n" +
+          `⚠️ עדיין לא הוגדר הצ'אט של ${recipient.label}.\n\n` +
           "כדי להגדיר פעם אחת:\n" +
-          "1. בקש מאור לשלוח <code>/start</code> לבוט הזה.\n" +
-          "2. אור ישלח <code>/whoami</code> ויקבל את ה-chat ID שלו.\n" +
-          "3. שלח כאן: <code>/שלח לאור הגדר [chat_id]</code>");
+          `1. בקש מ${recipient.label} לשלוח <code>/start</code> לבוט הזה.\n` +
+          `2. ${recipient.label} ישלח <code>/whoami</code> ויקבל את ה-chat ID שלו.\n` +
+          `3. שלח כאן: <code>/שלח ל${recipient.label} הגדר [chat_id]</code>`);
         res.json({ ok: true });
         return;
       }
 
-      if (String(orChatId) === chatId) {
-        await sendTelegramMessage(chatId, "ℹ️ אתה כבר אור — אין למי להעביר.");
+      if (String(destChatId) === chatId) {
+        await sendTelegramMessage(chatId, `ℹ️ אתה כבר ${recipient.label} — אין למי להעביר.`);
         res.json({ ok: true });
         return;
       }
@@ -323,13 +339,13 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
         return;
       }
 
-      await sendTelegramMessage(orChatId, `📨 <b>הודעה מ-${senderName}:</b>\n\n${payload}`);
-      await sendTelegramMessage(chatId, "✅ נשלח לאור.");
+      await sendTelegramMessage(destChatId, `📨 <b>הודעה מ-${senderName}:</b>\n\n${payload}`);
+      await sendTelegramMessage(chatId, `✅ נשלח ל${recipient.label}.`);
       res.json({ ok: true });
       return;
     }
 
-    // /whoami — reply with this chat's ID (used to configure Or's destination)
+    // /whoami — reply with this chat's ID (used to configure a manager's destination)
     if (text.toLowerCase() === "/whoami" || text === "/מי") {
       await sendTelegramMessage(chatId, `🆔 ה-chat ID שלך: <code>${chatId}</code>`);
       res.json({ ok: true });
