@@ -708,6 +708,9 @@ export interface OccupancySnapshot {
   departureRooms: string[];
   swapRooms: string[];
   turnoverRooms: string[];
+  totalBookings: number;   // distinct bookingId in the sheet
+  totalGuests: number;     // distinct guest names parsed from notes
+  guestNames: string[];    // the distinct guest names
 }
 
 /**
@@ -758,7 +761,24 @@ export function computeOccupancy(data: SheetData, targetDateISO?: string): Occup
   const arrivingSet = new Set(arrivalRooms);
   const turnoverRooms = departureRooms.filter(r => arrivingSet.has(r)).sort();
 
-  return { todayISO, todayDisplay, allRooms, occupiedRooms, vacantRooms, arrivalRooms, departureRooms, swapRooms, turnoverRooms };
+  // Guest / booking totals — "כמה לקוחות/אורחים/הזמנות יש".
+  const bookingCol = col("bookingId", 18);
+  const notesCol   = col("notes", 8);
+  const bookings = new Set<string>();
+  const guests   = new Set<string>();
+  for (const r of data.rows) {
+    const bid = (r[bookingCol] || "").trim();
+    if (bid) bookings.add(bid);
+    const m = (r[notesCol] || "").match(/אורח:\s*([^·\n]+)/);
+    if (m) guests.add(m[1].trim());
+  }
+  const guestNames = [...guests].sort((a, b) => a.localeCompare(b, "he"));
+
+  return {
+    todayISO, todayDisplay, allRooms, occupiedRooms, vacantRooms,
+    arrivalRooms, departureRooms, swapRooms, turnoverRooms,
+    totalBookings: bookings.size, totalGuests: guests.size, guestNames,
+  };
 }
 
 /**
@@ -808,11 +828,18 @@ export function buildOccupancyAnswer(
   const head = `🏨 <b>${clientName}</b> · ${s.todayDisplay}`;
 
   const lc = question.toLowerCase();
+  const wantsGuestCount = /לקוח|הזמנ/.test(lc) || (/כמה/.test(lc) && /אורח|דייר/.test(lc));
   const wantsVacant   = /ריק|פנוי|מתפנה|פנויים/.test(lc);
   const wantsSwap     = /מתחלף|החלפ|swap|turnover/.test(lc);
   const wantsArrival  = /נכנס|כניס|מגיע|צ'ק.?אין|check.?in/.test(lc);
   const wantsDeparture= /יוצא|יציא|עוזב|מתפנ|צ'ק.?אאוט|check.?out/.test(lc);
   const wantsOccupied = /מאוכלס|תפוס|תפוסה|שוהה|מי\s*(נמצא|יש)|דייר|אורח/.test(lc);
+
+  // Guest / booking totals — "כמה לקוחות/אורחים/הזמנות יש". Highest priority so
+  // "כמה אורחים" returns the total, not tonight's occupancy.
+  if (wantsGuestCount) {
+    return `🧾 <b>${clientName}</b> — לפי הגיליון: <b>${s.totalGuests}</b> אורחים ייחודיים ב-<b>${s.totalBookings}</b> הזמנות.`;
+  }
 
   // Specific single-metric questions → focused answer.
   if (wantsVacant && !wantsOccupied) {

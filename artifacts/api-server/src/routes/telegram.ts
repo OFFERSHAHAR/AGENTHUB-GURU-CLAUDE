@@ -755,7 +755,7 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
     // 1b. Occupancy questions → DETERMINISTIC answer straight from the live sheet.
     // Same source of truth as /דוח. We answer in JS (no LLM) so the numbers are
     // always correct and never blocked by model rate limits or hallucination.
-    const OCCUPANCY_RE = /מאוכלס|תפוס|תפוסה|ריק|פנוי|מתפנה|מתחלף|החלפ|כמה\s*חדר|כמה.*חדר|נכנס|יוצא|כניס|יציא|מי\s*(שוהה|נמצא|יש)|דייר|אורח|מצב/;
+    const OCCUPANCY_RE = /מאוכלס|תפוס|תפוסה|ריק|פנוי|מתפנה|מתחלף|החלפ|כמה\s*חדר|כמה.*חדר|נכנס|יוצא|כניס|יציא|מי\s*(שוהה|נמצא|יש)|דייר|אורח|לקוח|הזמנ|מצב/;
     if (OCCUPANCY_RE.test(text)) {
       try {
         const sheetRows = await db
