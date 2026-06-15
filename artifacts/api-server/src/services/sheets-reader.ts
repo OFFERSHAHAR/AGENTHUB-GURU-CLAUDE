@@ -697,8 +697,18 @@ export function buildDailyReport(
       );
     }
 
+    const occupiedRooms = allRooms.filter(r => occupiedTonight.has(r));
+
+    if (occupiedRooms.length > 0) {
+      lines.push(
+        "",
+        `🟦 <b>חדרים מאוכלסים הלילה (${occupiedRooms.length}/${allRooms.length}):</b>`,
+        ...occupiedRooms.map(r => `  • ${r}`),
+      );
+    }
+
     if (turnoverRooms.length > 0) {
-      lines.push("", `✨ <b>חדרים מתחלפים (${turnoverRooms.length}):</b>`);
+      lines.push("", `✨ <b>החלפות (${turnoverRooms.length}):</b>`);
       turnoverRooms.forEach(room => lines.push(`  ${room}`));
     }
 
