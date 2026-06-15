@@ -162,7 +162,11 @@ export async function readSheet(sheetUrlOrId: string, sheetName?: string, range 
     .filter((r) => r.some((v) => String(v).trim() !== ""))
     .map((r) => {
       const row: SheetRow = {};
-      headers.forEach((h, idx) => { row[h] = String(r[idx] ?? "").trim(); });
+      // Positional keys first — never collide, even when headers are empty
+      // (Google Sheets gviz CSV drops headers for date/number columns).
+      r.forEach((v, idx) => { row[`__c${idx}`] = String(v ?? "").trim(); });
+      // Named keys for columns that DO have a header label.
+      headers.forEach((h, idx) => { if (h) row[h] = String(r[idx] ?? "").trim(); });
       return row;
     });
 
@@ -517,29 +521,25 @@ export function buildDailyReport(
   const [y, mo, d] = todayISO.split("-");
   const todayDisplay = `${d}.${mo}.${y}`;
 
-  // Detect columns — Beit Williams Turnovers format
-  // Google Sheets CSV has empty header columns, so we detect by content
-  const unitCol = "room";
+  // Detect columns — Beit Williams "Turnovers" sheet (fixed schema).
+  // Google Sheets gviz CSV DROPS headers for date/number columns, so a
+  // name-based lookup returns undefined for arrivalDate/departureDate.
+  // We map by FIXED POSITION (the schema never changes), and fall back to
+  // the named header when it exists (e.g. Service Account API returns them).
+  //   col1=room · col2=date · col3=guests · col4=children · col5=babies
+  //   col8=notes · col17=eventType · col19=arrivalDate · col20=departureDate
+  const col = (name: string, pos: number): string =>
+    data.headers.includes(name) ? name : `__c${pos}`;
 
-  // dateCol: find first non-empty date-like column (contains year like 2026)
-  let dateCol: string | undefined;
-  if (data.rows.length > 0) {
-    const firstRow = data.rows[0];
-    for (const [key, value] of Object.entries(firstRow)) {
-      if (typeof value === 'string' && value.includes('2026')) {
-        dateCol = key;
-        break;
-      }
-    }
-  }
-
-  const eventTypeCol = "eventType";
-  const arrivalCol     = findCol(data.headers, ["arrivalDate", "arrivaldate", "arrival_date", ...CHECKIN_COLS]);
-  const departureCol   = findCol(data.headers, ["departureDate", "departuredate", "departure_date", ...CHECKOUT_COLS]);
-  const notesCol       = findCol(data.headers, ["notes", "הערות", "פרטים"]);
-  const guestsCountCol = findCol(data.headers, ["guests", "אורחים", "מספר אורחים"]);
-  const childrenCol    = findCol(data.headers, ["children", "ילדים", "kids"]);
-  const babiesCol      = findCol(data.headers, ["babies", "תינוקות", "infants"]);
+  const unitCol        = col("room", 1);
+  const dateCol        = col("date", 2);
+  const eventTypeCol   = col("eventType", 17);
+  const arrivalCol     = col("arrivalDate", 19);
+  const departureCol   = col("departureDate", 20);
+  const notesCol       = col("notes", 8);
+  const guestsCountCol = col("guests", 3);
+  const childrenCol    = col("children", 4);
+  const babiesCol      = col("babies", 5);
 
   // Parse guest name & phone out of the notes field
   // Format: "אורח: NAME · טלפון: PHONE · שהות: N לילות · ..."
@@ -574,45 +574,22 @@ export function buildDailyReport(
     return parts.join(" | ") || "(ללא פרטים)";
   }
 
-  // Classify arrivals vs departures for today's date
-  // Primary path: use eventType on the event date column
-  // Fallback: use arrivalDate / departureDate columns directly
-  let arrivalsToday:   SheetRow[];
-  let departuresToday: SheetRow[];
-
+  // Classify arrivals vs departures for today's date.
+  // Each booking has TWO rows (an arrival-type row + a departure-type row),
+  // both carrying the same arrivalDate/departureDate. We key off eventType so
+  // each booking is counted once on the correct side.
   const ARRIVAL_TYPES   = new Set(["arrival", "check-in", "checkin", "swap", "report-arrival", "booking"]);
   const SWAP_TYPES      = new Set(["swap"]);
   const DEPARTURE_TYPES = new Set(["departure", "check-out", "checkout", "report-departure"]);
 
-  if (dateCol && eventTypeCol) {
-    // Match date: handle both YYYY-MM-DD and YYYY-MM formats
-    const dateMatches = (cellDate: string): boolean => {
-      const parsed = parseDateStr(cellDate || "");
-      if (!parsed) return false;
-      // If cell is month-only (YYYY-MM), check if it starts with our month
-      if (parsed.length === 7 && todayISO.startsWith(parsed)) return true;
-      // Otherwise, exact match
-      return parsed === todayISO;
-    };
+  const eventOf = (r: SheetRow) => (r[eventTypeCol] || "").toLowerCase();
 
-    // Debug: log all rows with their date and type
-    console.log(`[buildDailyReport] dateCol="${dateCol}", eventTypeCol="${eventTypeCol}", todayISO="${todayISO}"`);
-    data.rows.slice(0, 5).forEach(r => {
-      const d = r[dateCol] || "";
-      const t = r[eventTypeCol] || "";
-      console.log(`[buildDailyReport] row: date="${d}", type="${t}", matches=${dateMatches(d)}, isArrival=${ARRIVAL_TYPES.has(t)}`);
-    });
-
-    arrivalsToday   = data.rows.filter(r =>
-      dateMatches(r[dateCol] || "") && ARRIVAL_TYPES.has(r[eventTypeCol] || ""),
-    );
-    departuresToday = data.rows.filter(r =>
-      dateMatches(r[dateCol] || "") && DEPARTURE_TYPES.has(r[eventTypeCol] || ""),
-    );
-  } else {
-    arrivalsToday   = arrivalCol   ? data.rows.filter(r => parseDateStr(r[arrivalCol]   || "") === todayISO) : [];
-    departuresToday = departureCol ? data.rows.filter(r => parseDateStr(r[departureCol] || "") === todayISO) : [];
-  }
+  let arrivalsToday: SheetRow[] = data.rows.filter(r =>
+    ARRIVAL_TYPES.has(eventOf(r)) && parseDateStr(r[arrivalCol] || "") === todayISO,
+  );
+  let departuresToday: SheetRow[] = data.rows.filter(r =>
+    DEPARTURE_TYPES.has(eventOf(r)) && parseDateStr(r[departureCol] || "") === todayISO,
+  );
 
   // Apply room filter (case-insensitive, partial match allowed)
   if (roomFilter && unitCol) {
@@ -678,12 +655,10 @@ export function buildDailyReport(
   }
 
   if (intent === "full") {
-    let swapsToday: SheetRow[] = [];
-    if (dateCol && eventTypeCol) {
-      swapsToday = data.rows.filter(r =>
-        parseDateStr(r[dateCol] || "") === todayISO && SWAP_TYPES.has(r[eventTypeCol] || ""),
-      );
-    }
+    // Swaps: a same-day turnover — the new guest's arrivalDate is today.
+    let swapsToday: SheetRow[] = data.rows.filter(r =>
+      SWAP_TYPES.has(eventOf(r)) && parseDateStr(r[arrivalCol] || "") === todayISO,
+    );
     if (roomFilter && unitCol) {
       const rf = roomFilter.trim().toLowerCase();
       swapsToday = swapsToday.filter(r => (r[unitCol] || "").toLowerCase().includes(rf));
@@ -701,6 +676,15 @@ export function buildDailyReport(
       lines.push("", `✨ <b>חדרים מתחלפים (${turnoverRooms.length}):</b>`);
       turnoverRooms.forEach(room => lines.push(`  ${room}`));
     }
+
+    const occupiedRooms = allRooms.filter(r => occupiedTonight.has(r));
+    lines.push(
+      "",
+      `🟦 <b>חדרים מאוכלסים הלילה (${occupiedRooms.length}/${allRooms.length}):</b>`,
+      ...(occupiedRooms.length === 0
+        ? ["  אין חדרים מאוכלסים"]
+        : occupiedRooms.map(r => `  • ${r}`)),
+    );
 
     lines.push(
       "",
