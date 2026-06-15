@@ -568,6 +568,7 @@ export function buildDailyReport(
   let departuresToday: SheetRow[];
 
   const ARRIVAL_TYPES   = new Set(["arrival", "check-in", "checkin", "swap", "report-arrival", "booking"]);
+  const SWAP_TYPES      = new Set(["swap"]);
   const DEPARTURE_TYPES = new Set(["departure", "check-out", "checkout", "report-departure"]);
 
   if (dateCol && eventTypeCol) {
@@ -646,8 +647,27 @@ export function buildDailyReport(
   }
 
   if (intent === "full") {
+    let swapsToday: SheetRow[] = [];
+    if (dateCol && eventTypeCol) {
+      swapsToday = data.rows.filter(r =>
+        parseDateStr(r[dateCol] || "") === todayISO && SWAP_TYPES.has(r[eventTypeCol] || ""),
+      );
+    }
+    if (roomFilter && unitCol) {
+      const rf = roomFilter.trim().toLowerCase();
+      swapsToday = swapsToday.filter(r => (r[unitCol] || "").toLowerCase().includes(rf));
+    }
+
+    if (swapsToday.length > 0) {
+      lines.push(
+        "",
+        `🔄 <b>החלפות ${dayLabel} (${swapsToday.length}):</b>`,
+        ...swapsToday.map(r => `  • ${guestLabel(r)}`),
+      );
+    }
+
     if (turnoverRooms.length > 0) {
-      lines.push("", `🔄 <b>חדרים מתחלפים (${turnoverRooms.length}):</b>`);
+      lines.push("", `✨ <b>חדרים מתחלפים (${turnoverRooms.length}):</b>`);
       turnoverRooms.forEach(room => lines.push(`  ${room}`));
     }
 
