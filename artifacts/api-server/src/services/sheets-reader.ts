@@ -595,6 +595,14 @@ export function buildDailyReport(
       return parsed === todayISO;
     };
 
+    // Debug: log all rows with their date and type
+    console.log(`[buildDailyReport] dateCol="${dateCol}", eventTypeCol="${eventTypeCol}", todayISO="${todayISO}"`);
+    data.rows.slice(0, 5).forEach(r => {
+      const d = r[dateCol] || "";
+      const t = r[eventTypeCol] || "";
+      console.log(`[buildDailyReport] row: date="${d}", type="${t}", matches=${dateMatches(d)}, isArrival=${ARRIVAL_TYPES.has(t)}`);
+    });
+
     arrivalsToday   = data.rows.filter(r =>
       dateMatches(r[dateCol] || "") && ARRIVAL_TYPES.has(r[eventTypeCol] || ""),
     );
