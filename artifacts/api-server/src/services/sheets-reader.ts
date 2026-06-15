@@ -585,11 +585,21 @@ export function buildDailyReport(
   const DEPARTURE_TYPES = new Set(["departure", "check-out", "checkout", "report-departure"]);
 
   if (dateCol && eventTypeCol) {
+    // Match date: handle both YYYY-MM-DD and YYYY-MM formats
+    const dateMatches = (cellDate: string): boolean => {
+      const parsed = parseDateStr(cellDate || "");
+      if (!parsed) return false;
+      // If cell is month-only (YYYY-MM), check if it starts with our month
+      if (parsed.length === 7 && todayISO.startsWith(parsed)) return true;
+      // Otherwise, exact match
+      return parsed === todayISO;
+    };
+
     arrivalsToday   = data.rows.filter(r =>
-      parseDateStr(r[dateCol] || "") === todayISO && ARRIVAL_TYPES.has(r[eventTypeCol] || ""),
+      dateMatches(r[dateCol] || "") && ARRIVAL_TYPES.has(r[eventTypeCol] || ""),
     );
     departuresToday = data.rows.filter(r =>
-      parseDateStr(r[dateCol] || "") === todayISO && DEPARTURE_TYPES.has(r[eventTypeCol] || ""),
+      dateMatches(r[dateCol] || "") && DEPARTURE_TYPES.has(r[eventTypeCol] || ""),
     );
   } else {
     arrivalsToday   = arrivalCol   ? data.rows.filter(r => parseDateStr(r[arrivalCol]   || "") === todayISO) : [];
