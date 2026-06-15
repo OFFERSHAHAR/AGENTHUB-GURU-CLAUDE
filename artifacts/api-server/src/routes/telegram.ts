@@ -5,7 +5,7 @@ import { eq, and, like } from "drizzle-orm";
 import { runAnalysis, extractClientInfo } from "../services/analysis.js";
 import { approveAndApply, cancelApproval } from "../services/optima-sync.js";
 import { answerCallbackQuery } from "../lib/telegram-api.js";
-import { readSheet, compareWithDb, buildCompareReport, buildDailyReport, buildOccupancyFacts, parseDateFromQuery, parseReportIntent, parseRoomFilter } from "../services/sheets-reader.js";
+import { readSheet, compareWithDb, buildCompareReport, buildDailyReport, buildOccupancyAnswer, parseDateFromQuery, parseReportIntent, parseRoomFilter } from "../services/sheets-reader.js";
 import { palgatePermitsTable } from "@workspace/db";
 import { runModelWithHistory } from "../services/model-router.js";
 import { maybeAnswerFromJournal } from "../services/journal-qa.js";
@@ -656,9 +656,9 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
       console.error("[telegram/chat journal]", e instanceof Error ? e.message : e);
     }
 
-    // 1b. Occupancy facts from the live sheet — for free-text questions about
-    // how many rooms are occupied/vacant/arriving/departing/swapping. Same source
-    // of truth as /דוח, so the chat answers match the report.
+    // 1b. Occupancy questions → DETERMINISTIC answer straight from the live sheet.
+    // Same source of truth as /דוח. We answer in JS (no LLM) so the numbers are
+    // always correct and never blocked by model rate limits or hallucination.
     const OCCUPANCY_RE = /מאוכלס|תפוס|תפוסה|ריק|פנוי|מתפנה|מתחלף|החלפ|כמה\s*חדר|כמה.*חדר|נכנס|יוצא|כניס|יציא|מי\s*(שוהה|נמצא|יש)|דייר|אורח|מצב/;
     if (OCCUPANCY_RE.test(text)) {
       try {
@@ -672,12 +672,14 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
         if (sheetRow?.inputSchema) {
           const sheetData = await readSheet(sheetRow.inputSchema, "Turnovers");
           const targetDate = parseDateFromQuery(text) ?? undefined;
-          const facts = buildOccupancyFacts(sheetData, sheetRow.clientName ?? "לקוח", targetDate);
-          // Sheet facts are authoritative — prepend them over any DB journal context.
-          journalContext = facts + (journalContext ? `\n\n${journalContext}` : "");
+          const answer = buildOccupancyAnswer(sheetData, sheetRow.clientName ?? "לקוח", text, targetDate);
+          await sendTelegramMessage(chatId, answer);
+          res.json({ ok: true });
+          return;
         }
       } catch (e) {
         console.error("[telegram/chat occupancy]", e instanceof Error ? e.message : e);
+        // fall through to the general model path on error
       }
     }
 

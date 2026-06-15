@@ -698,17 +698,24 @@ export function buildDailyReport(
   return lines.join("\n");
 }
 
+export interface OccupancySnapshot {
+  todayISO: string;
+  todayDisplay: string;
+  allRooms: string[];
+  occupiedRooms: string[];
+  vacantRooms: string[];
+  arrivalRooms: string[];
+  departureRooms: string[];
+  swapRooms: string[];
+  turnoverRooms: string[];
+}
+
 /**
- * Structured occupancy facts for the free-text chat assistant.
- * Same source of truth & same column mapping as buildDailyReport, but returns a
- * compact factual block the chat model answers FROM (it never invents counts).
- * Answers questions like "כמה חדרים מאוכלסים?", "כמה ריק?", "מי מתחלף היום?".
+ * Core occupancy computation — single source of truth shared by /דוח and the
+ * free-text chat answers. Same column mapping (fixed Turnovers positions, with
+ * named-header fallback) and the same arrivalDate<=today<departureDate rule.
  */
-export function buildOccupancyFacts(
-  data: SheetData,
-  clientName: string,
-  targetDateISO?: string,
-): string {
+export function computeOccupancy(data: SheetData, targetDateISO?: string): OccupancySnapshot {
   const todayISO = targetDateISO
     ?? new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
   const [y, mo, d] = todayISO.split("-");
@@ -725,6 +732,8 @@ export function buildOccupancyFacts(
   const SWAP_TYPES      = new Set(["swap"]);
   const DEPARTURE_TYPES = new Set(["departure", "check-out", "checkout", "report-departure"]);
   const eventOf = (r: SheetRow) => (r[eventTypeCol] || "").toLowerCase();
+  const roomsOf = (rows: SheetRow[]) =>
+    [...new Set(rows.map(r => r[unitCol]).filter(Boolean))].sort();
 
   const allRooms = [...new Set(data.rows.map(r => r[unitCol] || "").filter(Boolean))].sort();
 
@@ -739,35 +748,99 @@ export function buildOccupancyFacts(
   const occupiedRooms = allRooms.filter(r => occupied.has(r));
   const vacantRooms   = allRooms.filter(r => !occupied.has(r));
 
-  const arrivalsToday = data.rows.filter(r =>
-    ARRIVAL_TYPES.has(eventOf(r)) && parseDateStr(r[arrivalCol] || "") === todayISO);
-  const departuresToday = data.rows.filter(r =>
-    DEPARTURE_TYPES.has(eventOf(r)) && parseDateStr(r[departureCol] || "") === todayISO);
-  const swapsToday = data.rows.filter(r =>
-    SWAP_TYPES.has(eventOf(r)) && parseDateStr(r[arrivalCol] || "") === todayISO);
+  const arrivalRooms = roomsOf(data.rows.filter(r =>
+    ARRIVAL_TYPES.has(eventOf(r)) && parseDateStr(r[arrivalCol] || "") === todayISO));
+  const departureRooms = roomsOf(data.rows.filter(r =>
+    DEPARTURE_TYPES.has(eventOf(r)) && parseDateStr(r[departureCol] || "") === todayISO));
+  const swapRooms = roomsOf(data.rows.filter(r =>
+    SWAP_TYPES.has(eventOf(r)) && parseDateStr(r[arrivalCol] || "") === todayISO));
 
-  const roomsArriving  = new Set(arrivalsToday.map(r => r[unitCol]).filter(Boolean));
-  const roomsDeparting = new Set(departuresToday.map(r => r[unitCol]).filter(Boolean));
-  const turnoverRooms  = [...roomsDeparting].filter(r => roomsArriving.has(r)).sort();
+  const arrivingSet = new Set(arrivalRooms);
+  const turnoverRooms = departureRooms.filter(r => arrivingSet.has(r)).sort();
 
-  const roomsOf = (rows: SheetRow[]) =>
-    [...new Set(rows.map(r => r[unitCol]).filter(Boolean))].join(", ") || "—";
+  return { todayISO, todayDisplay, allRooms, occupiedRooms, vacantRooms, arrivalRooms, departureRooms, swapRooms, turnoverRooms };
+}
 
+/**
+ * Structured occupancy facts block — injected into the chat system prompt so the
+ * model can phrase answers grounded in real numbers (never invents counts).
+ */
+export function buildOccupancyFacts(
+  data: SheetData,
+  clientName: string,
+  targetDateISO?: string,
+): string {
+  const s = computeOccupancy(data, targetDateISO);
+  const j = (a: string[]) => a.join(", ") || "—";
   return [
     "---",
     "",
-    `## 📊 נתוני תפוסה — ${clientName} (לתאריך ${todayDisplay} · מקור אמת: הגיליון)`,
-    `- סה"כ חדרים: ${allRooms.length} (${allRooms.join(", ")})`,
-    `- מאוכלסים הלילה: ${occupiedRooms.length} (${occupiedRooms.join(", ") || "—"})`,
-    `- ריקים הלילה: ${vacantRooms.length} (${vacantRooms.join(", ") || "—"})`,
-    `- נכנסים היום: ${arrivalsToday.length} (${roomsOf(arrivalsToday)})`,
-    `- יוצאים היום: ${departuresToday.length} (${roomsOf(departuresToday)})`,
-    `- החלפות היום (יציאה+כניסה באותו חדר): ${turnoverRooms.length} (${turnoverRooms.join(", ") || "—"})`,
-    `- חדרים בהחלפה (swap) היום: ${swapsToday.length} (${roomsOf(swapsToday)})`,
+    `## 📊 נתוני תפוסה — ${clientName} (לתאריך ${s.todayDisplay} · מקור אמת: הגיליון)`,
+    `- סה"כ חדרים: ${s.allRooms.length} (${j(s.allRooms)})`,
+    `- מאוכלסים הלילה: ${s.occupiedRooms.length} (${j(s.occupiedRooms)})`,
+    `- ריקים הלילה: ${s.vacantRooms.length} (${j(s.vacantRooms)})`,
+    `- נכנסים היום: ${s.arrivalRooms.length} (${j(s.arrivalRooms)})`,
+    `- יוצאים היום: ${s.departureRooms.length} (${j(s.departureRooms)})`,
+    `- החלפות היום (יציאה+כניסה באותו חדר): ${s.turnoverRooms.length} (${j(s.turnoverRooms)})`,
+    `- חדרים בהחלפה (swap) היום: ${s.swapRooms.length} (${j(s.swapRooms)})`,
     "",
     "## הנחיות תשובה",
     "- ענה בעברית, בקצרה וברור, אך ורק על סמך המספרים שלמעלה.",
     "- אל תמציא חדרים, שמות או מספרים שלא מופיעים למעלה.",
+  ].join("\n");
+}
+
+/**
+ * Deterministic, targeted Hebrew answer to a free-text occupancy question.
+ * Computed in JS from the sheet (no LLM) so the numbers are always correct and
+ * never blocked by rate limits. Picks the relevant metric from the question;
+ * falls back to a full summary for broad ("מה המצב") questions.
+ */
+export function buildOccupancyAnswer(
+  data: SheetData,
+  clientName: string,
+  question: string,
+  targetDateISO?: string,
+): string {
+  const s = computeOccupancy(data, targetDateISO);
+  const j = (a: string[]) => a.join(", ") || "—";
+  const when = targetDateISO ? `ל-${s.todayDisplay}` : "הלילה";
+  const head = `🏨 <b>${clientName}</b> · ${s.todayDisplay}`;
+
+  const lc = question.toLowerCase();
+  const wantsVacant   = /ריק|פנוי|מתפנה|פנויים/.test(lc);
+  const wantsSwap     = /מתחלף|החלפ|swap|turnover/.test(lc);
+  const wantsArrival  = /נכנס|כניס|מגיע|צ'ק.?אין|check.?in/.test(lc);
+  const wantsDeparture= /יוצא|יציא|עוזב|מתפנ|צ'ק.?אאוט|check.?out/.test(lc);
+  const wantsOccupied = /מאוכלס|תפוס|תפוסה|שוהה|מי\s*(נמצא|יש)|דייר|אורח/.test(lc);
+
+  // Specific single-metric questions → focused answer.
+  if (wantsVacant && !wantsOccupied) {
+    return `${head}\n\n🏠 <b>ריקים ${when} (${s.vacantRooms.length}/${s.allRooms.length}):</b> ${j(s.vacantRooms)}`;
+  }
+  if (wantsSwap) {
+    const tu = s.turnoverRooms.length ? j(s.turnoverRooms) : (s.swapRooms.length ? j(s.swapRooms) : "אין");
+    return `${head}\n\n🔄 <b>חדרים בהחלפה היום (${Math.max(s.turnoverRooms.length, s.swapRooms.length)}):</b> ${tu}`;
+  }
+  if (wantsArrival && !wantsDeparture && !wantsOccupied) {
+    return `${head}\n\n🟢 <b>נכנסים היום (${s.arrivalRooms.length}):</b> ${j(s.arrivalRooms)}`;
+  }
+  if (wantsDeparture && !wantsArrival && !wantsOccupied) {
+    return `${head}\n\n🔴 <b>יוצאים היום (${s.departureRooms.length}):</b> ${j(s.departureRooms)}`;
+  }
+  if (wantsOccupied && !wantsVacant) {
+    return `${head}\n\n🟦 <b>מאוכלסים ${when} (${s.occupiedRooms.length}/${s.allRooms.length}):</b> ${j(s.occupiedRooms)}`;
+  }
+
+  // Broad / mixed question → full snapshot.
+  return [
+    head,
+    "",
+    `🟦 מאוכלסים ${when} (${s.occupiedRooms.length}/${s.allRooms.length}): ${j(s.occupiedRooms)}`,
+    `🏠 ריקים ${when} (${s.vacantRooms.length}/${s.allRooms.length}): ${j(s.vacantRooms)}`,
+    `🟢 נכנסים היום (${s.arrivalRooms.length}): ${j(s.arrivalRooms)}`,
+    `🔴 יוצאים היום (${s.departureRooms.length}): ${j(s.departureRooms)}`,
+    `🔄 החלפות היום (${s.turnoverRooms.length}): ${j(s.turnoverRooms)}`,
   ].join("\n");
 }
 
