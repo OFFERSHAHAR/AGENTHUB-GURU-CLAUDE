@@ -698,6 +698,79 @@ export function buildDailyReport(
   return lines.join("\n");
 }
 
+/**
+ * Structured occupancy facts for the free-text chat assistant.
+ * Same source of truth & same column mapping as buildDailyReport, but returns a
+ * compact factual block the chat model answers FROM (it never invents counts).
+ * Answers questions like "כמה חדרים מאוכלסים?", "כמה ריק?", "מי מתחלף היום?".
+ */
+export function buildOccupancyFacts(
+  data: SheetData,
+  clientName: string,
+  targetDateISO?: string,
+): string {
+  const todayISO = targetDateISO
+    ?? new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
+  const [y, mo, d] = todayISO.split("-");
+  const todayDisplay = `${d}.${mo}.${y}`;
+
+  const col = (name: string, pos: number): string =>
+    data.headers.includes(name) ? name : `__c${pos}`;
+  const unitCol      = col("room", 1);
+  const eventTypeCol = col("eventType", 17);
+  const arrivalCol   = col("arrivalDate", 19);
+  const departureCol = col("departureDate", 20);
+
+  const ARRIVAL_TYPES   = new Set(["arrival", "check-in", "checkin", "swap", "report-arrival", "booking"]);
+  const SWAP_TYPES      = new Set(["swap"]);
+  const DEPARTURE_TYPES = new Set(["departure", "check-out", "checkout", "report-departure"]);
+  const eventOf = (r: SheetRow) => (r[eventTypeCol] || "").toLowerCase();
+
+  const allRooms = [...new Set(data.rows.map(r => r[unitCol] || "").filter(Boolean))].sort();
+
+  const occupied = new Set<string>();
+  for (const r of data.rows) {
+    const room = r[unitCol];
+    if (!room) continue;
+    const ci = parseDateStr(r[arrivalCol]   || "");
+    const co = parseDateStr(r[departureCol] || "");
+    if (ci && co && ci <= todayISO && co > todayISO) occupied.add(room);
+  }
+  const occupiedRooms = allRooms.filter(r => occupied.has(r));
+  const vacantRooms   = allRooms.filter(r => !occupied.has(r));
+
+  const arrivalsToday = data.rows.filter(r =>
+    ARRIVAL_TYPES.has(eventOf(r)) && parseDateStr(r[arrivalCol] || "") === todayISO);
+  const departuresToday = data.rows.filter(r =>
+    DEPARTURE_TYPES.has(eventOf(r)) && parseDateStr(r[departureCol] || "") === todayISO);
+  const swapsToday = data.rows.filter(r =>
+    SWAP_TYPES.has(eventOf(r)) && parseDateStr(r[arrivalCol] || "") === todayISO);
+
+  const roomsArriving  = new Set(arrivalsToday.map(r => r[unitCol]).filter(Boolean));
+  const roomsDeparting = new Set(departuresToday.map(r => r[unitCol]).filter(Boolean));
+  const turnoverRooms  = [...roomsDeparting].filter(r => roomsArriving.has(r)).sort();
+
+  const roomsOf = (rows: SheetRow[]) =>
+    [...new Set(rows.map(r => r[unitCol]).filter(Boolean))].join(", ") || "—";
+
+  return [
+    "---",
+    "",
+    `## 📊 נתוני תפוסה — ${clientName} (לתאריך ${todayDisplay} · מקור אמת: הגיליון)`,
+    `- סה"כ חדרים: ${allRooms.length} (${allRooms.join(", ")})`,
+    `- מאוכלסים הלילה: ${occupiedRooms.length} (${occupiedRooms.join(", ") || "—"})`,
+    `- ריקים הלילה: ${vacantRooms.length} (${vacantRooms.join(", ") || "—"})`,
+    `- נכנסים היום: ${arrivalsToday.length} (${roomsOf(arrivalsToday)})`,
+    `- יוצאים היום: ${departuresToday.length} (${roomsOf(departuresToday)})`,
+    `- החלפות היום (יציאה+כניסה באותו חדר): ${turnoverRooms.length} (${turnoverRooms.join(", ") || "—"})`,
+    `- חדרים בהחלפה (swap) היום: ${swapsToday.length} (${roomsOf(swapsToday)})`,
+    "",
+    "## הנחיות תשובה",
+    "- ענה בעברית, בקצרה וברור, אך ורק על סמך המספרים שלמעלה.",
+    "- אל תמציא חדרים, שמות או מספרים שלא מופיעים למעלה.",
+  ].join("\n");
+}
+
 /** Fallback: plain sheet summary (no DB comparison) */
 export function buildSheetSummary(data: SheetData, sheetTitle?: string): string {
   const timeStr = new Date(data.fetchedAt).toLocaleString("he-IL", {
