@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { randomUUID } from "node:crypto";
-import { db, clientsTable, tokenUsageTable, settingsTable, agentsTable, assignmentsTable } from "@workspace/db";
+import { db, clientsTable, tokenUsageTable, settingsTable, agentsTable, assignmentsTable, workflowsTable, triggersTable, conversationsTable } from "@workspace/db";
 import { eq, and, like } from "drizzle-orm";
 import { runAnalysis, extractClientInfo } from "../services/analysis.js";
 import { approveAndApply, cancelApproval } from "../services/optima-sync.js";
@@ -103,6 +103,36 @@ async function persistRecipientChatId(key: string, chatId: string): Promise<void
       target: settingsTable.key,
       set: { value: chatId, updatedAt: new Date() },
     });
+}
+
+// Snapshot of the AgentHub database for grounded answers about the hub itself
+// (how many agents/workflows/triggers/clients exist, and which). Read-only.
+async function buildHubFacts(): Promise<string> {
+  const [agents, workflows, triggers, clients, convs] = await Promise.all([
+    db.select({ name: agentsTable.name, category: agentsTable.category, status: agentsTable.status }).from(agentsTable),
+    db.select({ name: workflowsTable.name, status: workflowsTable.status }).from(workflowsTable),
+    db.select({ id: triggersTable.id, status: triggersTable.status }).from(triggersTable),
+    db.select({ name: clientsTable.name, status: clientsTable.status }).from(clientsTable),
+    db.select({ id: conversationsTable.id }).from(conversationsTable),
+  ]);
+  const agentLines  = agents.length  ? agents.map(a => `  • ${a.name} (${a.category}, ${a.status})`).join("\n")  : "  (אין)";
+  const wfLines     = workflows.length ? workflows.map(w => `  • ${w.name} (${w.status})`).join("\n")           : "  (אין)";
+  const clientLines = clients.length ? clients.map(c => `  • ${c.name} (${c.status})`).join("\n")               : "  (אין)";
+  return [
+    "---",
+    "",
+    "## 🗄️ סקירת מאגר AgentHub (מקור אמת: ה-DB)",
+    `- סוכנים (agents): ${agents.length}`,
+    agentLines,
+    `- תהליכי עבודה (workflows): ${workflows.length}`,
+    wfLines,
+    `- טריגרים (triggers): ${triggers.length}`,
+    `- לקוחות (clients): ${clients.length}`,
+    clientLines,
+    `- שיחות (conversations): ${convs.length}`,
+    "",
+    "ענה אך ורק על סמך הנתונים האלה. אל תמציא סוכנים, מספרים או שמות.",
+  ].join("\n");
 }
 
 // Never hit the real Telegram API under the test runner — the bot token/chat id
@@ -854,13 +884,29 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
         console.error("[telegram/chat client-ctx]", e instanceof Error ? e.message : e);
       }
     }
+    // Hub questions (agents/workflows/triggers/clients counts & lists) → inject a
+    // live DB snapshot so answers are grounded in real data, not invented.
+    let hubContext = "";
+    const HUB_RE = /סוכן|סוכנים|agent|workflow|וורקפלו|תהליך|תהליכי|טריגר|trigger|אוטומצי|כמה.*(סוכן|workflow|תהליך|טריגר|לקוח|שיח)|רשימת|איזה.*(סוכן|workflow|תהליך)|מה יש (לנו|בהאב)|בהאב/i;
+    if (HUB_RE.test(text)) {
+      try {
+        hubContext = await buildHubFacts();
+      } catch (e) {
+        console.error("[telegram/chat hub-facts]", e instanceof Error ? e.message : e);
+      }
+    }
+
     const sysPrompt =
-      "אתה 'האבי בן האב' — העוזר האישי של אור ועופר, מנהלי AgentHub.\n" +
-      "AgentHub היא מערכת ניהול סוכני AI לעסקים. דבר בעברית, בחום, בקצרה וברור.\n" +
-      "תפקידך: לענות על כל שאלה בנוגע להאב — משתמשים, סוכנים, לקוחות ונתוני לקוחות " +
-      "(למשל בית ויליאמס), תפוסה, טריגרים, זמינות, סטטוסים והתראות.\n" +
-      "אל תמציא נתונים — אם אין לך מידע, אמור בכנות שאין לך גישה אליו כרגע." +
+      "אתה 'האבי בן האב' — היד הימנית של אור ועופר, מנהלי AgentHub, ועוזר עובדתי מהימן.\n" +
+      "AgentHub היא מערכת ניהול סוכני AI לעסקים. דבר בעברית, בחום, בקצרה וברור.\n\n" +
+      "כללי ברזל (אסור לחרוג):\n" +
+      "1. ענה אך ורק על סמך הנתונים שמופיעים בהקשר שלמטה. אם אין לך מידע — אמור בכנות 'אין לי את המידע הזה כרגע', אל תמציא.\n" +
+      "2. אינך מבצע פעולות בעצמך. אתה לא יכול לשנות, למחוק, ליצור, 'להשתלט', 'לצאת מהמערכת' או לפעול אוטונומית. אל תטען שעשית פעולה כלשהי.\n" +
+      "3. כל פעולה שמשנה משהו דורשת אישור מפורש של אור או עופר. אם מבקשים פעולה — אמור שתעביר אותה לאישור אדמין, ואל תתיימר לבצע.\n" +
+      "4. אל תמציא יכולות, תקציבים, צוותים או הבטחות. היצמד לעובדות.\n" +
+      "5. תפקידך: לענות על שאלות בנוגע להאב — סוכנים, workflows, טריגרים, לקוחות, תפוסה, סטטוסים — מהמידע שניתן לך." +
       clientCtxLine +
+      (hubContext ? `\n\n${hubContext}` : "") +
       (journalContext ? `\n\n${journalContext}` : "");
 
     let reply = deterministicAnswer ?? "";
