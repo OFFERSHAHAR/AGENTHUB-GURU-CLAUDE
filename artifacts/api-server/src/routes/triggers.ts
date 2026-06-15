@@ -831,7 +831,7 @@ router.post("/webhooks/trigger/:secret", async (req, res): Promise<void> => {
         if (sheetUrl && sheetUrl.includes("docs.google.com/spreadsheets")) {
           try {
             const [sheetData, dbPermits] = await Promise.all([
-              readSheet(sheetUrl),
+              readSheet(sheetUrl, "Turnovers"),
               clientId
                 ? db.select().from(palgatePermitsTable).where(eq(palgatePermitsTable.clientId, clientId))
                 : Promise.resolve([]),

@@ -321,7 +321,7 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
         }
 
         const [sheetData, dbPermits] = await Promise.all([
-          readSheet(row.inputSchema),
+          readSheet(row.inputSchema, "Turnovers"),
           row.clientId
             ? db.select().from(palgatePermitsTable).where(eq(palgatePermitsTable.clientId, row.clientId))
             : Promise.resolve([]),
