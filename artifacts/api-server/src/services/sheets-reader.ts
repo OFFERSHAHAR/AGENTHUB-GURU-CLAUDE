@@ -518,10 +518,16 @@ export function buildDailyReport(
   const todayDisplay = `${d}.${mo}.${y}`;
 
   // Detect columns — Beit Williams Turnovers format (Google Sheets CSV with empty columns)
-  // Fixed positions: room=col 2, date=col 3, eventType=col 19
-  const unitCol        = findCol(data.headers, [...UNIT_COLS, "room"]) || (data.rows.length > 0 ? "room" : undefined);
-  const dateCol        = findCol(data.headers, ["date", "תאריך"]) || (data.rows.length > 0 && data.rows[0][2] ? (Object.keys(data.rows[0])[2] || undefined) : undefined);
-  const eventTypeCol   = findCol(data.headers, ["eventType", "eventtype", "event_type", "type"]);
+  // Manual position mapping based on actual data structure
+  const unitCol        = "room";  // column 2 in data
+  const dateCol        = data.rows.length > 0 ? Object.keys(data.rows[0])[2] : undefined;  // column 3 in data
+  const eventTypeCol   = "eventType";  // column 19 in data
+
+  // Debug: log what we detected
+  if (data.rows.length > 0) {
+    console.log(`[sheets-reader] Detected columns: unitCol=${unitCol}, dateCol=${dateCol}, eventTypeCol=${eventTypeCol}`);
+    console.log(`[sheets-reader] Sample row: room=${data.rows[0][unitCol]}, date=${data.rows[0][dateCol]}, type=${data.rows[0][eventTypeCol]}`);
+  }
   const arrivalCol     = findCol(data.headers, ["arrivalDate", "arrivaldate", "arrival_date", ...CHECKIN_COLS]);
   const departureCol   = findCol(data.headers, ["departureDate", "departuredate", "departure_date", ...CHECKOUT_COLS]);
   const notesCol       = findCol(data.headers, ["notes", "הערות", "פרטים"]);
