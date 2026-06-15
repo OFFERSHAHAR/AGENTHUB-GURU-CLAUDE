@@ -689,11 +689,59 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
     history.push({ role: "user", content: text });
     if (history.length > CHAT_MAX_TURNS * 2) history.splice(0, 2); // drop oldest pair
 
-    // 3. Build system prompt — include active client context when set
-    const clientCtxLine = activeClientCtx
-      ? `\n\nלקוח פעיל בשיחה זו: <b>${activeClientCtx.name}</b> (ID ${activeClientCtx.id}).` +
-        ` ענה על שאלות בהקשר הלקוח הזה.`
-      : "";
+    // 3. Build system prompt — include FULL active-client record so the model can
+    // answer any topic (spec, agents, status, contact, notes) from existing data.
+    let clientCtxLine = "";
+    if (activeClientCtx) {
+      clientCtxLine =
+        `\n\nלקוח פעיל בשיחה זו: <b>${activeClientCtx.name}</b> (ID ${activeClientCtx.id}).` +
+        ` ענה על שאלות בהקשר הלקוח הזה בלבד.`;
+      try {
+        const [c] = await db
+          .select({
+            industry: clientsTable.industry,
+            status: clientsTable.status,
+            tier: clientsTable.tier,
+            notes: clientsTable.notes,
+            contactEmail: clientsTable.contactEmail,
+            source: clientsTable.source,
+            rawSpec: clientsTable.rawSpec,
+            analysisDoc: clientsTable.analysisDoc,
+            analysisStatus: clientsTable.analysisStatus,
+          })
+          .from(clientsTable)
+          .where(eq(clientsTable.id, activeClientCtx.id))
+          .limit(1);
+        const agentsForClient = await db
+          .select({ name: agentsTable.name, tags: agentsTable.tags, description: agentsTable.description })
+          .from(assignmentsTable)
+          .innerJoin(agentsTable, eq(agentsTable.id, assignmentsTable.agentId))
+          .where(eq(assignmentsTable.clientId, activeClientCtx.id));
+
+        const clip = (s: string | null | undefined, n: number) =>
+          s ? (s.length > n ? s.slice(0, n) + "…" : s) : "";
+        const spec = clip(c?.analysisDoc || c?.rawSpec, 2500);
+        const agentLines = agentsForClient.length
+          ? agentsForClient.map(a => `  • ${a.name}${a.tags ? ` [${a.tags}]` : ""}${a.description ? ` — ${clip(a.description, 120)}` : ""}`).join("\n")
+          : "  (אין סוכנים משויכים)";
+
+        const parts: string[] = ["---", "", `## 🗂️ כרטיס לקוח — ${activeClientCtx.name} (מקור אמת: מאגר ההאב)`];
+        if (c?.industry)       parts.push(`- תעשייה: ${c.industry}`);
+        if (c?.status)         parts.push(`- סטטוס: ${c.status}`);
+        if (c?.tier)           parts.push(`- חבילה (tier): ${c.tier}`);
+        if (c?.contactEmail)   parts.push(`- איש קשר: ${c.contactEmail}`);
+        if (c?.source)         parts.push(`- מקור: ${c.source}`);
+        if (c?.analysisStatus) parts.push(`- סטטוס איפיון: ${c.analysisStatus}`);
+        if (c?.notes)          parts.push(`- הערות: ${c.notes}`);
+        parts.push(`- סוכנים משויכים:\n${agentLines}`);
+        if (spec) parts.push("", "### 📄 איפיון / מסמך עבודה", spec);
+        parts.push("", "ענה אך ורק על סמך הנתונים שלמעלה. אם פרט מסוים אינו מופיע — אמור שאין לגביו מידע, אל תמציא.");
+
+        clientCtxLine += `\n\n${parts.join("\n")}`;
+      } catch (e) {
+        console.error("[telegram/chat client-ctx]", e instanceof Error ? e.message : e);
+      }
+    }
     const sysPrompt =
       "אתה 'האבי בן האב' — העוזר האישי של אור ועופר, מנהלי AgentHub.\n" +
       "AgentHub היא מערכת ניהול סוכני AI לעסקים. דבר בעברית, בחום, בקצרה וברור.\n" +
