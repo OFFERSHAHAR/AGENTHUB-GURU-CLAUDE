@@ -8,6 +8,7 @@ import {
   DeleteWorkflowParams,
   GetWorkflowParams,
 } from "@workspace/api-zod";
+import { runWorkflow, type WFNode, type WFEdge } from "../services/workflow-engine.js";
 
 const router: IRouter = Router();
 
@@ -92,6 +93,47 @@ router.patch("/workflows/:id", async (req, res): Promise<void> => {
   }
 
   res.json(serializeWorkflow(workflow));
+});
+
+// Execute a workflow for real (bounded). Body: { input?: object }.
+router.post("/workflows/:id/run", async (req, res): Promise<void> => {
+  const params = IdParam.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [workflow] = await db
+    .select()
+    .from(workflowsTable)
+    .where(eq(workflowsTable.id, params.data.id));
+
+  if (!workflow) {
+    res.status(404).json({ error: "Workflow not found" });
+    return;
+  }
+
+  let nodes: WFNode[] = [];
+  let edges: WFEdge[] = [];
+  try {
+    nodes = JSON.parse(workflow.nodes || "[]");
+    edges = JSON.parse(workflow.edges || "[]");
+  } catch {
+    res.status(400).json({ error: "Workflow graph is corrupt (invalid JSON in nodes/edges)" });
+    return;
+  }
+  if (!Array.isArray(nodes) || nodes.length === 0) {
+    res.status(400).json({ error: "ל-workflow אין צמתים להרצה" });
+    return;
+  }
+
+  try {
+    const input = req.body && typeof req.body.input === "object" ? req.body.input : undefined;
+    const run = await runWorkflow(nodes, edges, input);
+    res.json({ workflowId: workflow.id, name: workflow.name, ...run });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 router.delete("/workflows/:id", async (req, res): Promise<void> => {

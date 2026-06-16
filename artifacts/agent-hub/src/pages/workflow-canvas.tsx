@@ -883,6 +883,64 @@ function CanvasInner({ workflowId }: { workflowId: number }) {
     }
   };
 
+  // Real execution against the backend engine (saves the canvas first, then runs).
+  const handleRunReal = async () => {
+    const issues = validateWorkflow(nodes, edges);
+    setValidationIssues(issues);
+    if (issues.filter(i => i.severity === "error").length > 0) {
+      setShowValidation(true);
+      toast({ title: "❌ תקן שגיאות לפני הרצה", variant: "destructive" });
+      return;
+    }
+
+    setSimRunning(true);
+    setSimSteps([]);
+    setShowConsole(true);
+    setShowValidation(false);
+    const initMap: RunStateMap = {};
+    nodes.forEach(n => { initMap[n.id] = "idle"; });
+    setRunStateMap(initMap);
+
+    try {
+      // Persist the current canvas so the engine runs exactly what's on screen.
+      const cleanNodes = nodes.map(n => ({ id: n.id, type: n.type, position: n.position, data: n.data }));
+      await fetch(`/api/workflows/${workflowId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: workflowName, nodes: JSON.stringify(cleanNodes), edges: JSON.stringify(edges) }),
+      });
+
+      const res = await fetch(`/api/workflows/${workflowId}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "❌ הרצה נכשלה", description: data?.error || `HTTP ${res.status}`, variant: "destructive" });
+        return;
+      }
+
+      const map: RunStateMap = { ...initMap };
+      for (const s of (data.steps ?? [])) {
+        map[s.nodeId] = s.status as RunState;
+        setRunStateMap({ ...map });
+        setSimSteps(prev => [...prev, {
+          nodeId: s.nodeId, nodeLabel: s.label, nodeType: s.type,
+          state: s.status as RunState, message: s.message, duration: 0, payload: s.output,
+        }]);
+      }
+      toast({
+        title: data.ok ? "✅ הרצה אמיתית הושלמה" : "⚠️ הרצה הסתיימה עם שגיאות",
+        description: `${data.agentCalls ?? 0} קריאות מודל אמיתיות`,
+      });
+    } catch (e) {
+      toast({ title: "❌ שגיאת הרצה", description: String(e), variant: "destructive" });
+    } finally {
+      setSimRunning(false);
+    }
+  };
+
   const handleExportN8n = () => {
     const issues = validateWorkflow(nodes, edges);
     const errors = issues.filter(i => i.severity === "error");
@@ -962,6 +1020,12 @@ function CanvasInner({ workflowId }: { workflowId: number }) {
             : simHasError ? <><XCircle className="w-3 h-3 text-red-500" />Run Test</>
             : <><Play className="w-3 h-3" />Run Test</>
           }
+        </Button>
+
+        {/* Run for real (backend engine) */}
+        <Button variant="outline" size="sm" onClick={simRunning ? undefined : handleRunReal} disabled={simRunning} className="h-7 rounded-lg text-xs gap-1.5 px-3 border-emerald-500 text-emerald-600 hover:bg-emerald-50">
+          <Play className="w-3 h-3" />
+          הרץ אמיתי
         </Button>
 
         {/* Export n8n */}
