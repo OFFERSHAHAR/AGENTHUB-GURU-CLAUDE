@@ -252,7 +252,9 @@ router.get("/assignments/:id/trigger", async (req, res): Promise<void> => {
     .limit(1);
 
   if (!trigger) {
-    res.status(404).json({ error: "No trigger configured for this assignment" });
+    // Optional resource — return 200/null (not 404) so the assignment card shows
+    // an "idle / no trigger" state without a console/network error.
+    res.json(null);
     return;
   }
 

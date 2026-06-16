@@ -22,7 +22,9 @@ router.get("/clients/:id/orchestrator", async (req, res): Promise<void> => {
     .where(eq(orchestratorsTable.clientId, params.data.id));
 
   if (!config) {
-    res.status(404).json({ error: "Orchestrator config not found" });
+    // Optional resource — return 200/null (not 404) so the UI shows an empty
+    // orchestrator without a console/network error.
+    res.json(null);
     return;
   }
 
