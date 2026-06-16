@@ -43,13 +43,23 @@ const USER_LOG_MAX = 30;
 const WEBHOOK_SECRET_KEY = "telegram_webhook_secret";
 
 // Authenticated chats — a chat must verify (/אימות <password>) before the bot
-// shares any information, so a bot in the wrong hands leaks nothing. In-memory
-// with a TTL; re-auth required after it expires or on redeploy.
+// shares any information. Persisted in the DB so the session survives redeploys
+// and is remembered until the user explicitly logs out (/התנתק). In-memory map
+// is just a hot cache.
 const authedChats = new Map<string, { manager: string; at: number }>();
-const AUTH_TTL_MS = 12 * 60 * 60 * 1000; // 12h
-function isAuthed(chatId: string): boolean {
-  const a = authedChats.get(chatId);
-  return !!a && Date.now() - a.at < AUTH_TTL_MS;
+const AUTH_CHAT_KEY = (chatId: string) => `auth_chat_${chatId}`;
+async function authedManager(chatId: string): Promise<string | null> {
+  const cached = authedChats.get(chatId);
+  if (cached) return cached.manager;
+  const persisted = await getSetting(AUTH_CHAT_KEY(chatId));
+  if (persisted) {
+    authedChats.set(chatId, { manager: persisted, at: Date.now() });
+    return persisted;
+  }
+  return null;
+}
+async function isAuthed(chatId: string): Promise<boolean> {
+  return (await authedManager(chatId)) !== null;
 }
 // Settings keys hold the manager passwords (never stored in code/Git).
 const PASS_KEYS: Record<string, string> = { "אור": "mgr_pass_or", "עופר": "mgr_pass_ofer" };
@@ -120,6 +130,10 @@ async function persistRecipientChatId(key: string, chatId: string): Promise<void
 async function getSetting(key: string): Promise<string | null> {
   const [row] = await db.select({ value: settingsTable.value }).from(settingsTable).where(eq(settingsTable.key, key)).limit(1);
   return row?.value ?? null;
+}
+
+async function deleteSetting(key: string): Promise<void> {
+  await db.delete(settingsTable).where(eq(settingsTable.key, key));
 }
 
 // Match an entered password to a manager. Passwords live in the settings table
@@ -391,13 +405,15 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
     // password. This protects data if the bot reaches the wrong hands.
     const fromName = [message.from?.first_name, message.from?.last_name].filter(Boolean).join(" ")
       || message.from?.username || "לא ידוע";
-    if (text.startsWith("/אימות") || text.toLowerCase().startsWith("/auth") || text.startsWith("/יציאה") || text.toLowerCase().startsWith("/logout")) {
-      if (text.startsWith("/יציאה") || text.toLowerCase().startsWith("/logout")) {
-        const who = authedChats.get(chatId)?.manager ?? null;
+    const isLogout = text.startsWith("/יציאה") || text.startsWith("/התנתק") || text.toLowerCase().startsWith("/logout");
+    if (text.startsWith("/אימות") || text.toLowerCase().startsWith("/auth") || isLogout) {
+      if (isLogout) {
+        const who = (await authedManager(chatId));
         authedChats.delete(chatId);
+        await deleteSetting(AUTH_CHAT_KEY(chatId)); // forget the persistent session
         const out = "🔒 התנתקת. נדרש אימות מחדש לקבלת מידע.";
         await sendTelegramMessage(chatId, out);
-        await logBotInteraction({ chatId, input: "/יציאה", output: out, eventType: "logout", provider: "guardrail", meta: { fromName, manager: who } });
+        await logBotInteraction({ chatId, input: "/התנתק", output: out, eventType: "logout", provider: "guardrail", meta: { fromName, manager: who } });
         res.json({ ok: true });
         return;
       }
@@ -410,7 +426,8 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
       const manager = await getManagerByPassword(pw);
       if (manager) {
         authedChats.set(chatId, { manager, at: Date.now() });
-        const out = `✅ אומת. שלום ${manager} — כעת תוכל לקבל מידע. (/יציאה לניתוק)`;
+        await persistRecipientChatId(AUTH_CHAT_KEY(chatId), manager); // remember until logout
+        const out = `✅ אומת. שלום ${manager} — אזכור אותך עד שתשלח /התנתק.`;
         await sendTelegramMessage(chatId, out);
         await logBotInteraction({ chatId, input: "/אימות ✓", output: out, eventType: "auth_success", provider: "guardrail", meta: { fromName, manager } });
       } else {
@@ -423,8 +440,8 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
     }
 
     // Gate: everything except basic/safe commands requires an authenticated chat.
-    const ALWAYS_ALLOWED = /^\/(start|אימות|auth|יציאה|logout|whoami|מי)\b/i;
-    if (!isAuthed(chatId) && !ALWAYS_ALLOWED.test(text)) {
+    const ALWAYS_ALLOWED = /^\/(start|אימות|auth|יציאה|התנתק|logout|whoami|מי)\b/i;
+    if (!(await isAuthed(chatId)) && !ALWAYS_ALLOWED.test(text)) {
       const out = "🔒 <b>נדרש אימות</b>\nכדי לקבל מידע מההאב, אמת את זהותך:\n<code>/אימות הסיסמה-שלך</code>";
       await sendTelegramMessage(chatId, out);
       await logBotInteraction({ chatId, input: text, output: out, eventType: "access_denied", status: "warning", provider: "guardrail", meta: { fromName } });
