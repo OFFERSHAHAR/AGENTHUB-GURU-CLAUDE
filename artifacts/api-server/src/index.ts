@@ -5,6 +5,23 @@ import { eq, lt, and } from "drizzle-orm";
 
 const STUCK_TRIGGER_THRESHOLD_MS = 15 * 60 * 1000;
 const PERIODIC_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
+const SELF_PING_INTERVAL_MS = 4 * 60 * 1000; // < Render's ~15 min idle window
+
+/**
+ * Keep the free-tier instance warm: ping our own public URL every few minutes.
+ * Render's spin-down timer resets on inbound traffic, so this prevents the slow
+ * cold start that drops the first Telegram message. Hitting a DB-backed route
+ * also keeps Neon awake. No-op when no public URL is known (local/dev).
+ */
+function startSelfPing(): void {
+  const base = process.env.RENDER_EXTERNAL_URL || process.env.APP_BASE_URL;
+  if (!base || process.env.NODE_ENV === "test") return;
+  const url = `${base.replace(/\/$/, "")}/api/stats/summary`;
+  setInterval(() => {
+    fetch(url).catch(() => {});
+  }, SELF_PING_INTERVAL_MS).unref();
+  logger.info({ url }, "[keep-warm] self-ping enabled");
+}
 
 /**
  * Resets ALL triggers stuck in "running" state.
@@ -81,4 +98,5 @@ app.listen(port, (err) => {
   logger.info({ port }, "Server listening");
   recoverStuckTriggersAtStartup();
   setInterval(sweepStuckTriggers, PERIODIC_SWEEP_INTERVAL_MS).unref();
+  startSelfPing();
 });

@@ -4,18 +4,20 @@ name: keep-alive
 # which would drop the first Telegram message a manager sends.
 on:
   schedule:
-    - cron: "*/10 * * * *" # every 10 minutes
+    - cron: "*/5 * * * *" # every 5 minutes (GitHub may delay scheduled runs)
   workflow_dispatch: {}
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping API
+      - name: Warm API + DB
+        # Hit a DB-touching endpoint so BOTH Render (app) and Neon (database)
+        # stay awake — /healthz alone wouldn't keep the DB warm.
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 https://agenthub-guru-claude-api.onrender.com/api/healthz)
-          echo "API /api/healthz -> $code"
-      - name: Ping Frontend
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 https://agenthub-guru-claude-api.onrender.com/api/stats/summary)
+          echo "API /api/stats/summary -> $code"
+      - name: Warm Frontend
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 https://agenthub-guru-claude.onrender.com/)
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 https://agenthub-guru-claude.onrender.com/)
           echo "Frontend / -> $code"
