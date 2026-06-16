@@ -38,6 +38,22 @@ export interface WorkflowRunResult {
 const MAX_AGENT_CALLS = 5;     // bound model usage per run
 const MAX_DELAY_MS = 2000;     // never hang on a delay node
 
+type NodeKind = "trigger" | "agent" | "condition" | "delay" | "output";
+
+/**
+ * Normalize node types across the two schemes in the codebase:
+ *   - canvas builder: triggerNode / agentNode / conditionNode / delayNode / outputNode
+ *   - generated flows: trigger / ai / condition / notification / action / data
+ */
+function normalizeKind(type: string): NodeKind {
+  const x = (type || "").toLowerCase();
+  if (x.includes("trigger")) return "trigger";
+  if (x.includes("agent") || x === "ai" || x.includes("llm") || x.includes("model")) return "agent";
+  if (x.includes("condition") || x.includes("if") || x.includes("switch") || x.includes("filter")) return "condition";
+  if (x.includes("delay") || x.includes("wait") || x.includes("sleep")) return "delay";
+  return "output"; // output / action / notification / data / webhook / etc.
+}
+
 /** Kahn topological sort; leftover (cyclic) nodes are appended so nothing is dropped. */
 function topoSort(nodes: WFNode[], edges: WFEdge[]): WFNode[] {
   const indeg = new Map<string, number>();
@@ -81,56 +97,58 @@ export async function runWorkflow(
 
   for (const node of topoSort(nodes, edges)) {
     const d = node.data ?? {};
-    const label = String(d.label || node.type || "node");
     const type = node.type || "";
+    const kind = normalizeKind(type);
+    const label = String(d.label || type || kind);
     try {
-      if (type === "triggerNode") {
-        steps.push({ nodeId: node.id, label, type, status: "success", message: `Trigger "${String(d.triggerType ?? "manual")}" — payload ready`, output: payload });
+      if (kind === "trigger") {
+        steps.push({ nodeId: node.id, label, type, status: "success", message: `Trigger "${String(d.triggerType ?? type ?? "manual")}" — payload ready`, output: payload });
 
-      } else if (type === "agentNode") {
-        if (!d.agentId) {
-          steps.push({ nodeId: node.id, label, type, status: "error", message: "לא נבחר סוכן — לא ניתן להריץ צעד זה" });
-          continue;
-        }
+      } else if (kind === "agent") {
         if (agentCalls >= MAX_AGENT_CALLS) {
           steps.push({ nodeId: node.id, label, type, status: "skipped", message: "הושג מקסימום קריאות מודל להרצה אחת" });
           continue;
         }
-        const [agent] = await db.select().from(agentsTable).where(eq(agentsTable.id, Number(d.agentId))).limit(1);
-        if (!agent) {
-          steps.push({ nodeId: node.id, label, type, status: "error", message: `סוכן ${String(d.agentId)} לא נמצא במאגר` });
-          continue;
+        // Configured agent if agentId is set; otherwise a generic AI step so an
+        // unconfigured "ai" node still produces real output.
+        let agentName = "AI";
+        let sys = "אתה צעד AI ב-workflow. עבד את ה-payload שקיבלת והחזר תוצאה תמציתית ושימושית בעברית.";
+        if (d.agentId) {
+          const [agent] = await db.select().from(agentsTable).where(eq(agentsTable.id, Number(d.agentId))).limit(1);
+          if (agent) {
+            agentName = agent.name;
+            sys = agent.systemPrompt || `אתה ${agent.name}. ${agent.description}`;
+          }
+        } else if (typeof d.systemPrompt === "string" && d.systemPrompt.trim()) {
+          sys = d.systemPrompt;
         }
         agentCalls++;
         const tier: ModelTier = process.env.GROQ_API_KEY ? "fallback" : "free";
-        const sys = agent.systemPrompt || `אתה ${agent.name}. ${agent.description}`;
         const userMsg = JSON.stringify(payload).slice(0, 4000);
         const r = await runModel(tier, sys, userMsg, "workflow-run");
         const out = r.content && r.content !== "__TEMPLATE__" ? r.content : "(המודל אינו זמין כרגע)";
-        payload = { ...payload, agentResponse: out, processedBy: agent.name };
+        payload = { ...payload, agentResponse: out, processedBy: agentName };
         result = out;
         steps.push({ nodeId: node.id, label, type, status: "success", message: out.slice(0, 500), output: out });
 
-      } else if (type === "conditionNode") {
+      } else if (kind === "condition") {
         const expr = String(d.condition || "").trim();
-        let pass = false;
+        let pass = true; // empty condition = pass through
         if (expr) {
           const hay = JSON.stringify(payload).toLowerCase();
           pass = expr.toLowerCase() === "true" || hay.includes(expr.toLowerCase());
         }
-        steps.push({ nodeId: node.id, label, type, status: "success", message: `תנאי "${expr || "(ריק)"}" → ${pass ? "TRUE" : "FALSE"}`, output: pass });
+        steps.push({ nodeId: node.id, label, type, status: "success", message: `תנאי "${expr || "(ריק → עובר)"}" → ${pass ? "TRUE" : "FALSE"}`, output: pass });
 
-      } else if (type === "delayNode") {
+      } else if (kind === "delay") {
         const ms = Math.min(Math.max(Number(d.delay ?? 0) || 0, 0), MAX_DELAY_MS);
         if (ms > 0) await new Promise((r) => setTimeout(r, ms));
         steps.push({ nodeId: node.id, label, type, status: "success", message: `השהיה ${ms}ms` });
 
-      } else if (type === "outputNode") {
-        result = result ?? payload;
-        steps.push({ nodeId: node.id, label, type, status: "success", message: `פלט (${String(d.outputType ?? "result")})`, output: result });
-
       } else {
-        steps.push({ nodeId: node.id, label, type: type || "unknown", status: "skipped", message: `סוג צומת לא נתמך: ${type || "?"}` });
+        // output / action / notification / data — capture the running result.
+        result = result ?? payload;
+        steps.push({ nodeId: node.id, label, type, status: "success", message: `${type || "output"} — ${typeof result === "string" ? result.slice(0, 120) : "תוצאה נשמרה"}`, output: result });
       }
     } catch (err) {
       steps.push({ nodeId: node.id, label, type, status: "error", message: err instanceof Error ? err.message : String(err) });
