@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { randomUUID } from "node:crypto";
-import { db, clientsTable, tokenUsageTable, settingsTable, agentsTable, assignmentsTable, workflowsTable, triggersTable, conversationsTable } from "@workspace/db";
+import { db, clientsTable, tokenUsageTable, settingsTable, agentsTable, assignmentsTable, workflowsTable, triggersTable, conversationsTable, agentLogsTable } from "@workspace/db";
 import { eq, and, like } from "drizzle-orm";
 import { runAnalysis, extractClientInfo } from "../services/analysis.js";
 import { approveAndApply, cancelApproval } from "../services/optima-sync.js";
@@ -103,6 +103,34 @@ async function persistRecipientChatId(key: string, chatId: string): Promise<void
       target: settingsTable.key,
       set: { value: chatId, updatedAt: new Date() },
     });
+}
+
+// Persist every meaningful bot interaction (input + output) to agent_logs so it
+// shows up in the /logs feed — for tracking and learning across conversations.
+async function logBotInteraction(opts: {
+  chatId: string;
+  input: string;
+  output: string;
+  eventType?: string;
+  status?: string;
+  provider?: string;
+  clientId?: number | null;
+}): Promise<void> {
+  try {
+    await db.insert(agentLogsTable).values({
+      source: "telegram",
+      agentName: "האבי בן האב",
+      clientId: opts.clientId ?? null,
+      eventType: opts.eventType ?? "response",
+      status: opts.status ?? "success",
+      inputSummary: (opts.input || "").slice(0, 500),
+      outputSummary: (opts.output || "").slice(0, 500),
+      provider: opts.provider ?? null,
+      metadata: JSON.stringify({ chatId: opts.chatId }),
+    });
+  } catch (e) {
+    console.error("[telegram/log]", e instanceof Error ? e.message : e);
+  }
 }
 
 // Identify which manager is acting in this chat — maps a configured recipient
@@ -529,6 +557,7 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
         const sheetData = await readSheet(row.inputSchema, "Turnovers");
         const report = buildDailyReport(sheetData, row.clientName ?? "לקוח", targetDate, intent, roomFilter);
         await sendTelegramMessage(chatId, report);
+        await logBotInteraction({ chatId, input: text, output: report, eventType: "response", provider: "deterministic-sheet", clientId: row.clientId });
       } catch (err) {
         console.error("[telegram /דוח] error:", err instanceof Error ? err.message : err);
         await sendTelegramMessage(chatId, "❌ שגיאה בקריאת הגיליון. בדוק שהגיליון משותף עם חשבון השירות.");
@@ -834,6 +863,7 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
           const targetDate = parseDateFromQuery(text) ?? undefined;
           const answer = buildOccupancyAnswer(sheetData, sheetRow.clientName ?? "לקוח", text, targetDate);
           await sendTelegramMessage(chatId, answer);
+          await logBotInteraction({ chatId, input: text, output: answer, provider: "deterministic-sheet", clientId: resolvedClientId });
           res.json({ ok: true });
           return;
         }
@@ -947,6 +977,12 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
 
     history.push({ role: "assistant", content: reply });
     await sendLongMessage(chatId, reply);
+    await logBotInteraction({
+      chatId, input: text, output: reply,
+      provider: process.env.GROQ_API_KEY ? "groq" : "free",
+      clientId: resolvedClientId,
+      status: reply.startsWith("⚠️") || reply.startsWith("🤖 מצטער") ? "error" : "success",
+    });
     res.json({ ok: true });
 
   } catch (err) {
