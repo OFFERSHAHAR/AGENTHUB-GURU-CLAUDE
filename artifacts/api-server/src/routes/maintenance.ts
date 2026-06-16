@@ -168,7 +168,7 @@ async function sendTelegramReport(log: RunLog): Promise<void> {
   log.reportSent = true;
 }
 
-router.post("/api/maintenance/run", async (req, res) => {
+router.post("/maintenance/run", async (req, res) => {
   try {
     const log = await runAllChecks();
     const sendReport = req.body?.sendReport !== false;
@@ -181,11 +181,11 @@ router.post("/api/maintenance/run", async (req, res) => {
   }
 });
 
-router.get("/api/maintenance/logs", (_req, res) => {
+router.get("/maintenance/logs", (_req, res) => {
   res.json({ ok: true, logs: runHistory });
 });
 
-router.get("/api/maintenance/status", (_req, res) => {
+router.get("/maintenance/status", (_req, res) => {
   const lastRun = runHistory[0] ?? null;
 
   const now = new Date();
