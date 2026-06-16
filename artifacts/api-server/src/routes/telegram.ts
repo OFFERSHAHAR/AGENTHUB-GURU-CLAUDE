@@ -42,6 +42,18 @@ const userMessageLog = new Map<string, string[]>();
 const USER_LOG_MAX = 30;
 const WEBHOOK_SECRET_KEY = "telegram_webhook_secret";
 
+// Authenticated chats — a chat must verify (/אימות <password>) before the bot
+// shares any information, so a bot in the wrong hands leaks nothing. In-memory
+// with a TTL; re-auth required after it expires or on redeploy.
+const authedChats = new Map<string, { manager: string; at: number }>();
+const AUTH_TTL_MS = 12 * 60 * 60 * 1000; // 12h
+function isAuthed(chatId: string): boolean {
+  const a = authedChats.get(chatId);
+  return !!a && Date.now() - a.at < AUTH_TTL_MS;
+}
+// Settings keys hold the manager passwords (never stored in code/Git).
+const PASS_KEYS: Record<string, string> = { "אור": "mgr_pass_or", "עופר": "mgr_pass_ofer" };
+
 // Managers the bot can forward messages to via "/שלח ל<שם>".
 interface SendRecipient { aliases: string[]; key: string; label: string; envFallbacks: string[]; }
 const RECIPIENTS: SendRecipient[] = [
@@ -103,6 +115,23 @@ async function persistRecipientChatId(key: string, chatId: string): Promise<void
       target: settingsTable.key,
       set: { value: chatId, updatedAt: new Date() },
     });
+}
+
+async function getSetting(key: string): Promise<string | null> {
+  const [row] = await db.select({ value: settingsTable.value }).from(settingsTable).where(eq(settingsTable.key, key)).limit(1);
+  return row?.value ?? null;
+}
+
+// Match an entered password to a manager. Passwords live in the settings table
+// (or env fallback) — never in code. Returns the manager label or null.
+async function getManagerByPassword(pw: string): Promise<string | null> {
+  const candidate = pw.trim();
+  if (!candidate) return null;
+  for (const [manager, key] of Object.entries(PASS_KEYS)) {
+    const expected = (await getSetting(key)) ?? process.env[key.toUpperCase()];
+    if (expected && candidate === expected) return manager;
+  }
+  return null;
 }
 
 // Persist every meaningful bot interaction (input + output) to agent_logs so it
@@ -350,6 +379,42 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
       log.push(text);
       if (log.length > USER_LOG_MAX) log.splice(0, log.length - USER_LOG_MAX);
       userMessageLog.set(chatId, log);
+    }
+
+    // ── Identity verification (/אימות <סיסמה>) ────────────────────────────────
+    // The bot shares NO information until the chat verifies with a manager
+    // password. This protects data if the bot reaches the wrong hands.
+    if (text.startsWith("/אימות") || text.toLowerCase().startsWith("/auth") || text.startsWith("/יציאה") || text.toLowerCase().startsWith("/logout")) {
+      if (text.startsWith("/יציאה") || text.toLowerCase().startsWith("/logout")) {
+        authedChats.delete(chatId);
+        await sendTelegramMessage(chatId, "🔒 התנתקת. נדרש אימות מחדש לקבלת מידע.");
+        res.json({ ok: true });
+        return;
+      }
+      const pw = text.replace(/^\/אימות\s*/u, "").replace(/^\/auth\s*/i, "").trim();
+      if (!pw) {
+        await sendTelegramMessage(chatId, "🔑 שלח: <code>/אימות הסיסמה-שלך</code>");
+        res.json({ ok: true });
+        return;
+      }
+      const manager = await getManagerByPassword(pw);
+      if (manager) {
+        authedChats.set(chatId, { manager, at: Date.now() });
+        await sendTelegramMessage(chatId, `✅ אומת. שלום ${manager} — כעת תוכל לקבל מידע. (/יציאה לניתוק)`);
+      } else {
+        await sendTelegramMessage(chatId, "❌ סיסמה שגויה. אין גישה למידע.");
+      }
+      res.json({ ok: true });
+      return;
+    }
+
+    // Gate: everything except basic/safe commands requires an authenticated chat.
+    const ALWAYS_ALLOWED = /^\/(start|אימות|auth|יציאה|logout|whoami|מי)\b/i;
+    if (!isAuthed(chatId) && !ALWAYS_ALLOWED.test(text)) {
+      await sendTelegramMessage(chatId,
+        "🔒 <b>נדרש אימות</b>\nכדי לקבל מידע מההאב, אמת את זהותך:\n<code>/אימות הסיסמה-שלך</code>");
+      res.json({ ok: true });
+      return;
     }
 
     // /שלח ל<נמען> — forward what the user wrote to a manager's chat (אור / עופר).
@@ -989,6 +1054,26 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
     console.error("[telegram] webhook error:", err);
     res.status(500).json({ ok: false, error: "Internal error" });
   }
+});
+
+// POST /telegram/admin-setting — seed a whitelisted setting (manager passwords /
+// recipient chats) without committing secrets to code. Guarded by the webhook secret.
+router.post("/telegram/admin-setting", async (req, res): Promise<void> => {
+  const expectedSecret = await getWebhookSecret();
+  const providedSecret = req.get("x-telegram-bot-api-secret-token");
+  if (!expectedSecret || providedSecret !== expectedSecret) {
+    res.status(401).json({ ok: false, error: "unauthorized" });
+    return;
+  }
+  const key = typeof req.body?.key === "string" ? req.body.key : "";
+  const value = typeof req.body?.value === "string" ? req.body.value : "";
+  const allowed = new Set(["mgr_pass_or", "mgr_pass_ofer", "or_chat_id", "ofer_chat_id"]);
+  if (!allowed.has(key) || !value) {
+    res.status(400).json({ ok: false, error: "invalid key/value" });
+    return;
+  }
+  await persistRecipientChatId(key, value);
+  res.json({ ok: true, key });
 });
 
 // POST /telegram/setup — register webhook with Telegram
