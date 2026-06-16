@@ -1018,13 +1018,16 @@ const COMPLEXITY_META = {
 };
 
 // ─── Template Card ────────────────────────────────────────────────────────────
-function TemplateCard({ tmpl, model, embedModel, baseUrl }: { tmpl: TemplateDef; model: string; embedModel: string; baseUrl: string }) {
+function TemplateCard({ tmpl, model, embedModel, baseUrl, provider }: { tmpl: TemplateDef; model: string; embedModel: string; baseUrl: string; provider: "ollama" | "cloud" }) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const { toast } = useToast();
   const cx = COMPLEXITY_META[tmpl.complexity];
 
-  const generate = () => tmpl.generate(model, embedModel, baseUrl);
+  const generate = () => {
+    const wf = tmpl.generate(model, embedModel, baseUrl);
+    return provider === "cloud" ? toCloud(wf) : wf;
+  };
 
   const handleDownload = () => {
     const json = JSON.stringify(generate(), null, 2);
@@ -1142,8 +1145,37 @@ function TemplateCard({ tmpl, model, embedModel, baseUrl }: { tmpl: TemplateDef;
   );
 }
 
+// ─── Cloud (Groq) conversion ───────────────────────────────────────────────────
+// Rewrites Ollama LM/embedding nodes to OpenAI-compatible nodes pointed at Groq,
+// so the same templates work in production without a local Ollama. Node *names*
+// and connections are preserved (only type + parameters change).
+const GROQ_BASE = "https://api.groq.com/openai/v1";
+const CLOUD_CHAT_MODEL = "llama-3.3-70b-versatile"; // Groq, OpenAI-compatible
+const CLOUD_EMBED_MODEL = "text-embedding-3-small"; // OpenAI (Groq has no embeddings)
+
+function toCloud<T>(workflow: T): T {
+  const wf: any = JSON.parse(JSON.stringify(workflow));
+  if (Array.isArray(wf.nodes)) {
+    for (const n of wf.nodes) {
+      const t = String(n.type || "");
+      if (t.endsWith("lmOllama")) {
+        n.type = "@n8n/n8n-nodes-langchain.lmChatOpenAi";
+        const temp = n.parameters?.options?.temperature;
+        n.parameters = { model: CLOUD_CHAT_MODEL, options: { baseURL: GROQ_BASE, ...(temp != null ? { temperature: temp } : {}) } };
+      } else if (t.endsWith("embeddingsOllama")) {
+        n.type = "@n8n/n8n-nodes-langchain.embeddingsOpenAi";
+        n.parameters = { model: CLOUD_EMBED_MODEL, options: {} };
+      }
+    }
+  }
+  if (typeof wf.name === "string") wf.name = wf.name.replace(/Ollama/gi, "Groq");
+  if (Array.isArray(wf.tags)) wf.tags = wf.tags.map((tg: any) => (tg?.name === "Ollama" ? { ...tg, name: "Groq" } : tg));
+  return wf as T;
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function N8nTemplatesPage() {
+  const [provider, setProvider] = useState<"ollama" | "cloud">("ollama");
   const [model, setModel] = useState("llama3.2");
   const [embedModel, setEmbedModel] = useState("nomic-embed-text");
   const [baseUrl, setBaseUrl] = useState("http://localhost:11434");
@@ -1153,19 +1185,21 @@ export default function N8nTemplatesPage() {
   const filtered = filter === "All" ? TEMPLATES : TEMPLATES.filter(t => t.complexity === filter);
 
   const handleDownloadAll = () => {
+    const tag = provider === "cloud" ? "groq" : model.replace(/[^a-z0-9]/gi, "_");
     filtered.forEach((tmpl, i) => {
       setTimeout(() => {
-        const json = JSON.stringify(tmpl.generate(model, embedModel, baseUrl), null, 2);
+        const wf = tmpl.generate(model, embedModel, baseUrl);
+        const json = JSON.stringify(provider === "cloud" ? toCloud(wf) : wf, null, 2);
         const blob = new Blob([json], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${tmpl.id}_${model.replace(/[^a-z0-9]/gi, "_")}_n8n.json`;
+        a.download = `${tmpl.id}_${tag}_n8n.json`;
         a.click();
         URL.revokeObjectURL(url);
       }, i * 300);
     });
-    toast({ title: `📦 מוריד ${filtered.length} טמפלטים`, description: "בדוק את תיקיית ההורדות" });
+    toast({ title: `📦 מוריד ${filtered.length} טמפלטים`, description: provider === "cloud" ? "גרסת ענן (Groq)" : "גרסה מקומית (Ollama)" });
   };
 
   return (
@@ -1210,7 +1244,28 @@ export default function N8nTemplatesPage() {
           <Settings2 className="w-4 h-4 text-primary" />
           <h2 className="font-bold text-[13px] text-foreground">הגדרות גלובליות — יחולו על כל הטמפלטים</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        {/* Provider toggle: local Ollama vs cloud Groq */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10.5px] font-semibold uppercase tracking-widest text-muted-foreground">ספק מודל:</span>
+          <div className="inline-flex rounded-xl border border-border overflow-hidden">
+            <button onClick={() => setProvider("ollama")}
+              className={`px-3.5 py-1.5 text-[12px] font-semibold transition-colors ${provider === "ollama" ? "bg-primary text-primary-foreground" : "bg-white text-muted-foreground hover:bg-slate-50"}`}>
+              💻 מקומי (Ollama)
+            </button>
+            <button onClick={() => setProvider("cloud")}
+              className={`px-3.5 py-1.5 text-[12px] font-semibold transition-colors ${provider === "cloud" ? "bg-emerald-600 text-white" : "bg-white text-muted-foreground hover:bg-slate-50"}`}>
+              ☁️ ענן (Groq)
+            </button>
+          </div>
+          {provider === "cloud" && (
+            <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1">
+              צמתי ה-LLM יומרו ל-OpenAI/Groq ({CLOUD_CHAT_MODEL}). ב-n8n: הוסף Credential של OpenAI עם Base URL <code>{GROQ_BASE}</code> ומפתח Groq.
+            </span>
+          )}
+        </div>
+
+        <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${provider === "cloud" ? "opacity-50 pointer-events-none" : ""}`}>
           <div className="space-y-1.5">
             <label className="text-[10.5px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
               <Brain className="w-3 h-3" />מודל שיחה (LLM)
@@ -1298,7 +1353,7 @@ export default function N8nTemplatesPage() {
       <motion.div layout className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         <AnimatePresence>
           {filtered.map(tmpl => (
-            <TemplateCard key={tmpl.id} tmpl={tmpl} model={model} embedModel={embedModel} baseUrl={baseUrl} />
+            <TemplateCard key={tmpl.id} tmpl={tmpl} model={model} embedModel={embedModel} baseUrl={baseUrl} provider={provider} />
           ))}
         </AnimatePresence>
       </motion.div>
