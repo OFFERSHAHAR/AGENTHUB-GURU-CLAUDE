@@ -49,7 +49,7 @@ function normalizeKind(type: string): NodeKind {
   const x = (type || "").toLowerCase();
   if (x.includes("trigger")) return "trigger";
   if (x.includes("agent") || x === "ai" || x.includes("llm") || x.includes("model")) return "agent";
-  if (x.includes("condition") || x.includes("if") || x.includes("switch") || x.includes("filter")) return "condition";
+  if (x.includes("condition") || x === "if" || x.includes("switch") || x.includes("filter")) return "condition";
   if (x.includes("delay") || x.includes("wait") || x.includes("sleep")) return "delay";
   return "output"; // output / action / notification / data / webhook / etc.
 }
