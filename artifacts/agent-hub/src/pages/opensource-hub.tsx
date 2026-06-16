@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useListAgents, useUpdateAgent, getListAgentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -107,6 +107,30 @@ const MODELS = ["gpt-4o", "gpt-4o-mini", "claude-3-5-sonnet", "claude-3-haiku", 
 const MEMORY_OPTS = ["none", "session", "persistent"];
 const OS_AGENT_NAMES = Object.keys(OS_META);
 
+// ─── Live GitHub stars (fetched once, shared across cards) ─────────────────────
+const repoOf = (github: string) => github.replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "");
+function formatStars(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, "")}k`;
+  return String(n);
+}
+let _starsCache: Record<string, number> | null = null;
+let _starsPromise: Promise<Record<string, number>> | null = null;
+function loadGithubStars(): Promise<Record<string, number>> {
+  if (_starsCache) return Promise.resolve(_starsCache);
+  if (_starsPromise) return _starsPromise;
+  const repos = Object.values(OS_META).map((m) => repoOf(m.github)).join(",");
+  _starsPromise = fetch(`/api/opensource/stars?repos=${encodeURIComponent(repos)}`)
+    .then((r) => r.json())
+    .then((d) => {
+      const out: Record<string, number> = {};
+      for (const [k, v] of Object.entries(d?.stars ?? {})) if (typeof v === "number") out[k] = v;
+      _starsCache = out;
+      return out;
+    })
+    .catch(() => ({} as Record<string, number>));
+  return _starsPromise;
+}
+
 // ─── Capability chip ──────────────────────────────────────────────────────────
 function CapChip({ cap }: { cap: string }) {
   return (
@@ -130,6 +154,15 @@ function AgentCard({ agent }: { agent: ReturnType<typeof useListAgents>["data"] 
   const { toast } = useToast();
 
   const meta = OS_META[agent.name] ?? OS_META["AutoGPT"];
+  const [liveStars, setLiveStars] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const repo = repoOf(meta.github);
+    loadGithubStars().then((map) => {
+      if (alive && typeof map[repo] === "number") setLiveStars(formatStars(map[repo]));
+    });
+    return () => { alive = false; };
+  }, [meta.github]);
   const caps: string[] = (() => { try { return JSON.parse(agent.capabilities || "[]"); } catch { return []; } })();
   const isDirty = localTemp !== (agent.temperature ?? 0.7) || localModel !== (agent.model ?? "gpt-4o") || localMemory !== (agent.memoryType ?? "none") || localTimeout !== (agent.timeout ?? 60);
 
@@ -171,7 +204,7 @@ function AgentCard({ agent }: { agent: ReturnType<typeof useListAgents>["data"] 
               <span className="text-[10px] text-muted-foreground font-medium">{meta.origin}</span>
               <span className="text-[10px] text-muted-foreground">·</span>
               <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-500">
-                <Star className="w-2.5 h-2.5 fill-amber-400 stroke-amber-400" />{meta.stars}
+                <Star className="w-2.5 h-2.5 fill-amber-400 stroke-amber-400" />{liveStars ?? meta.stars}
               </span>
               <span className="text-[10px] text-muted-foreground">·</span>
               <span className="text-[10px] text-muted-foreground">{meta.architecture}</span>

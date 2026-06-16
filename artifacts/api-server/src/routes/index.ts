@@ -29,6 +29,7 @@ import emailRouter from "./email";
 import emailClassifierRouter from "./email-classifier";
 import publicChatRouter from "./public-chat";
 import controlRoomRouter from "./control-room";
+import opensourceRouter from "./opensource";
 
 const router: IRouter = Router();
 
@@ -62,6 +63,7 @@ router.use(emailRouter);
 router.use(emailClassifierRouter);
 router.use(publicChatRouter);
 router.use(controlRoomRouter);
+router.use(opensourceRouter);
 
 // Start daily 05:00 maintenance scheduler (non-blocking)
 startMaintenanceScheduler();
