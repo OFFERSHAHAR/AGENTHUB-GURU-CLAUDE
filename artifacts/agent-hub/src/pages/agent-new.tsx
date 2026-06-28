@@ -59,7 +59,7 @@ export default function AgentNew() {
   // Profile
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState("Sales");
   const [iconEmoji, setIconEmoji] = useState("🤖");
   const [status, setStatus] = useState("active");
   const [capInput, setCapInput] = useState("");
@@ -193,6 +193,7 @@ export default function AgentNew() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {!category && <p className="text-[11px] text-destructive mt-1">בחר קטגוריה כדי ליצור סוכן.</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Status</Label>
@@ -379,7 +380,7 @@ export default function AgentNew() {
 
         <div className="flex gap-3 mt-6">
           <motion.div whileTap={{ scale: 0.97 }} className="flex-1">
-            <Button type="submit" disabled={!canSubmit} className="w-full h-10 rounded-lg font-semibold gap-2">
+            <Button type="submit" disabled={!canSubmit} title={!category ? "בחר קטגוריה" : undefined} className="w-full h-10 rounded-lg font-semibold gap-2">
               {createAgent.isPending ? <><Loader2 className="w-4 h-4 animate-spin" />Creating…</> : "Create Agent"}
             </Button>
           </motion.div>

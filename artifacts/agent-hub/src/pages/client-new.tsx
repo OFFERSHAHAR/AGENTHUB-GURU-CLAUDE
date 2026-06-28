@@ -28,7 +28,7 @@ export default function ClientNew() {
   const createClient = useCreateClient();
 
   const [name, setName] = useState("");
-  const [industry, setIndustry] = useState("");
+  const [industry, setIndustry] = useState("Technology");
   const [contactEmail, setContactEmail] = useState("");
   const [status, setStatus] = useState("active");
   const [notes, setNotes] = useState("");
@@ -120,6 +120,7 @@ export default function ClientNew() {
                   ))}
                 </SelectContent>
               </Select>
+              {!industry && <p className="text-[11px] text-destructive mt-1">בחר תחום פעילות כדי לפתוח לקוח.</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
@@ -175,7 +176,7 @@ export default function ClientNew() {
 
         <div className="flex gap-3">
           <motion.div whileTap={{ scale: 0.97 }} className="flex-1">
-            <Button type="submit" disabled={!canSubmit} className="w-full h-10 rounded-lg font-semibold gap-2">
+            <Button type="submit" disabled={!canSubmit} title={!industry ? "בחר תחום פעילות" : undefined} className="w-full h-10 rounded-lg font-semibold gap-2">
               {createClient.isPending ? (
                 <><Loader2 className="w-4 h-4 animate-spin" />Onboarding…</>
               ) : (

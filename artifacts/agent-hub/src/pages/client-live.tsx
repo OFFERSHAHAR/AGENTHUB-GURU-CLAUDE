@@ -139,17 +139,18 @@ export default function ClientLivePage() {
   const fetchAll = useCallback(async () => {
     try {
       const [clientRes, assignRes, agentsRes, logsRes] = await Promise.all([
-        fetch(`${API}/api/clients/${id}`).then(r => r.json()),
-        fetch(`${API}/api/clients/${id}/assignments`).then(r => r.json()),
-        fetch(`${API}/api/agents`).then(r => r.json()),
-        fetch(`${API}/api/clients/${id}/automation-logs`).then(r => r.json()).catch(() => ({ logs: [] })),
+        fetch(`${API}/api/clients/${id}`, { credentials: "include" }).then(r => r.json()),
+        fetch(`${API}/api/clients/${id}/assignments`, { credentials: "include" }).then(r => r.json()),
+        fetch(`${API}/api/agents`, { credentials: "include" }).then(r => r.json()),
+        fetch(`${API}/api/clients/${id}/automation-logs`, { credentials: "include" }).then(r => r.json()).catch(() => ({ logs: [] })),
       ]);
-      if (clientRes.client) setClient(clientRes.client);
-      if (Array.isArray(assignRes.assignments)) setAssignments(assignRes.assignments);
-      if (Array.isArray(agentsRes.agents)) setAgents(agentsRes.agents);
-      const fetchedLogs: AutomationLog[] = Array.isArray(logsRes.logs) ? logsRes.logs : [];
+      setClient(clientRes?.client ?? clientRes ?? null);
+      setAssignments(Array.isArray(assignRes?.assignments) ? assignRes.assignments : Array.isArray(assignRes) ? assignRes : []);
+      const fetchedAgents: Agent[] = Array.isArray(agentsRes?.agents) ? agentsRes.agents : Array.isArray(agentsRes) ? agentsRes : [];
+      setAgents(fetchedAgents);
+      const fetchedLogs: AutomationLog[] = Array.isArray(logsRes?.logs) ? logsRes.logs : Array.isArray(logsRes) ? logsRes : [];
       setLogs(fetchedLogs);
-      setEvents(logsToEvents(fetchedLogs, agentsRes.agents ?? []));
+      setEvents(logsToEvents(fetchedLogs, fetchedAgents));
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {

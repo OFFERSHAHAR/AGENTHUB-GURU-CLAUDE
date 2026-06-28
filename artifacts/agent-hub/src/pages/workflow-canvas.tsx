@@ -216,6 +216,17 @@ function DelayNode({ data, selected }: NodeProps) {
 
 const NODE_TYPES = { triggerNode: TriggerNode, agentNode: AgentNode, conditionNode: ConditionNode, outputNode: OutputNode, delayNode: DelayNode };
 
+function normalizeNodeType(type: string | undefined): string | undefined {
+  const map: Record<string, string> = {
+    trigger: "triggerNode",
+    agent: "agentNode",
+    condition: "conditionNode",
+    output: "outputNode",
+    delay: "delayNode",
+  };
+  return type ? (map[type] ?? type) : type;
+}
+
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const PALETTE = [
   { type: "triggerNode", label: "Trigger", icon: <Zap className="w-3.5 h-3.5" />, color: "#6366f1", bg: "#eef2ff", defaultData: { label: "Start", triggerType: "manual" } },
@@ -240,7 +251,7 @@ interface ValidationIssue {
 function validateWorkflow(nodes: Node[], edges: Edge[]): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
-  const triggers = nodes.filter(n => n.type === "triggerNode");
+  const triggers = nodes.filter(n => n.type === "triggerNode" || n.type === "trigger");
   if (triggers.length === 0) {
     issues.push({ id: "no-trigger", severity: "error", message: "חסר Trigger — כל workflow חייב להתחיל מ-Trigger" });
   }
@@ -250,24 +261,24 @@ function validateWorkflow(nodes: Node[], edges: Edge[]): ValidationIssue[] {
 
   const connectedNodeIds = new Set([...edges.map(e => e.source), ...edges.map(e => e.target)]);
   nodes.forEach(n => {
-    if (n.type === "agentNode") {
+    if (n.type === "agentNode" || n.type === "agent") {
       const d = n.data as AgentData;
       if (!d.agentId) {
         issues.push({ id: `no-agent-${n.id}`, severity: "error", nodeId: n.id, message: `Node "${d.label || n.id}": לא נבחר סוכן` });
       }
     }
-    if (n.type === "conditionNode") {
+    if (n.type === "conditionNode" || n.type === "condition") {
       const d = n.data as ConditionData;
       if (!d.condition?.trim()) {
         issues.push({ id: `no-cond-${n.id}`, severity: "warning", nodeId: n.id, message: `Condition "${d.label || n.id}": ביטוי ריק — תמיד יחזיר FALSE` });
       }
     }
-    if (nodes.length > 1 && !connectedNodeIds.has(n.id) && n.type !== "triggerNode") {
+    if (nodes.length > 1 && !connectedNodeIds.has(n.id) && n.type !== "triggerNode" && n.type !== "trigger") {
       issues.push({ id: `floating-${n.id}`, severity: "warning", nodeId: n.id, message: `Node "${(n.data as Record<string, unknown>).label || n.id}" מנותק — לא מחובר לאף edge` });
     }
   });
 
-  const outputs = nodes.filter(n => n.type === "outputNode");
+  const outputs = nodes.filter(n => n.type === "outputNode" || n.type === "output");
   if (outputs.length === 0 && nodes.length > 1) {
     issues.push({ id: "no-output", severity: "warning", message: "אין Output node — הworkflow לא יחזיר תגובה" });
   }
@@ -288,6 +299,12 @@ interface SimStep {
   message: string;
   duration: number;
   payload?: Record<string, unknown>;
+}
+
+function toSimStepState(status: unknown): SimStep["state"] {
+  return status === "success" || status === "error" || status === "skipped" || status === "warning"
+    ? status
+    : "warning";
 }
 
 function topoSort(nodes: Node[], edges: Edge[]): Node[] {
@@ -787,7 +804,10 @@ function CanvasInner({ workflowId }: { workflowId: number }) {
     try {
       const parsedNodes = JSON.parse(workflow.nodes || "[]");
       const parsedEdges = JSON.parse(workflow.edges || "[]");
-      setNodes(parsedNodes.length > 0 ? parsedNodes : [{
+      const normalizedNodes = Array.isArray(parsedNodes)
+        ? parsedNodes.map((node: Node) => ({ ...node, type: normalizeNodeType(node.type) }))
+        : [];
+      setNodes(normalizedNodes.length > 0 ? normalizedNodes : [{
         id: "trigger-1", type: "triggerNode", position: { x: 250, y: 50 },
         data: { label: "Start", triggerType: "manual" },
       }]);
@@ -927,7 +947,7 @@ function CanvasInner({ workflowId }: { workflowId: number }) {
         setRunStateMap({ ...map });
         setSimSteps(prev => [...prev, {
           nodeId: s.nodeId, nodeLabel: s.label, nodeType: s.type,
-          state: s.status as RunState, message: s.message, duration: 0, payload: s.output,
+          state: toSimStepState(s.status), message: s.message, duration: 0, payload: s.output,
         }]);
       }
       toast({

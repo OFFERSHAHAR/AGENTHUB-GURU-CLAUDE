@@ -30,6 +30,7 @@ import emailClassifierRouter from "./email-classifier";
 import publicChatRouter from "./public-chat";
 import controlRoomRouter from "./control-room";
 import opensourceRouter from "./opensource";
+import { requireAuth } from "../middleware/require-auth";
 
 const router: IRouter = Router();
 
@@ -38,6 +39,8 @@ startLogProcessor();
 
 router.use(healthRouter);
 router.use(authRouter);
+
+router.use(requireAuth);
 router.use(agentsRouter);
 router.use(clientsRouter);
 router.use(assignmentsRouter);

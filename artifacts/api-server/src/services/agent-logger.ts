@@ -46,6 +46,32 @@ function truncate(s: string | undefined | null, maxLen = 500): string | undefine
   return s.length > maxLen ? s.slice(0, maxLen) + "…" : s;
 }
 
+const SECRET_PATTERNS: RegExp[] = [
+  /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi,
+  /\b(authorization|token|access_token|refresh_token|api[_-]?key|secret|password)\b\s*[:=]\s*["']?[^"',\s}]+/gi,
+  /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,
+];
+
+function redactSecrets(value: string | undefined | null): string | undefined {
+  if (!value) return undefined;
+  return SECRET_PATTERNS.reduce((text, pattern) => text.replace(pattern, "[REDACTED_SECRET]"), value);
+}
+
+function sanitizeMetadata(value: unknown): unknown {
+  if (typeof value === "string") return redactSecrets(value);
+  if (Array.isArray(value)) return value.map(sanitizeMetadata);
+  if (!value || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, entry]) => {
+      if (/authorization|token|api[_-]?key|secret|password/i.test(key)) {
+        return [key, "[REDACTED_SECRET]"];
+      }
+      return [key, sanitizeMetadata(entry)];
+    }),
+  );
+}
+
 /**
  * Log a single agent event to the DB.
  * Fire-and-forget — errors are swallowed to avoid breaking request handlers.
@@ -59,16 +85,16 @@ export function logEvent(input: LogEventInput): void {
     agentName: input.agentName ?? null,
     clientId: input.clientId ?? null,
     conversationId: input.conversationId ?? null,
-    inputSummary: truncate(input.inputSummary),
-    outputSummary: truncate(input.outputSummary),
+    inputSummary: truncate(redactSecrets(input.inputSummary)),
+    outputSummary: truncate(redactSecrets(input.outputSummary)),
     provider: input.provider ?? null,
     model: input.model ?? null,
     inputTokens: input.inputTokens ?? null,
     outputTokens: input.outputTokens ?? null,
     estimatedCostUsd: input.estimatedCostUsd ?? null,
     durationMs: input.durationMs ?? null,
-    errorMessage: input.errorMessage ?? null,
-    metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+    errorMessage: redactSecrets(input.errorMessage) ?? null,
+    metadata: input.metadata ? JSON.stringify(sanitizeMetadata(input.metadata)) : null,
   };
 
   db.insert(agentLogsTable).values(row).catch((err: unknown) => {

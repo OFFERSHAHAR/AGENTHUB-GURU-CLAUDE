@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -57,6 +58,14 @@ const pageVariants = {
 
 const BASE_PATH = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
+function RedirectHome() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    setLocation("/", { replace: true });
+  }, [setLocation]);
+  return null;
+}
+
 function AppRoutes() {
   const [location] = useLocation();
 
@@ -73,6 +82,8 @@ function AppRoutes() {
         >
           <Switch>
             <Route path="/" component={Dashboard} />
+            <Route path="/login" component={RedirectHome} />
+            <Route path="/dashboard" component={RedirectHome} />
             <Route path="/agents/new" component={AgentNew} />
             <Route path="/agents/:id" component={AgentDetail} />
             <Route path="/agents" component={AgentsPage} />
