@@ -1,40 +1,11 @@
 import { Router, type IRouter, type Response } from "express";
-import { randomUUID, createHmac, timingSafeEqual } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { verifyTelegramInitData } from "../lib/telegram-init-data.js";
 import { runModel } from "../services/model-router.js";
 
 const router: IRouter = Router();
 
-// ─── Telegram WebApp initData verification ─────────────────────────────────────
-// The Mini App must prove the request really comes from a Telegram user by
-// sending the signed `initData` string. We validate the HMAC using the bot token
-// per Telegram's spec. This is the access control for who may inject commands.
-const AUTH_MAX_AGE_SEC = 24 * 60 * 60; // reject initData older than 24h
-
-function verifyTelegramInitData(initData: string, botToken: string): boolean {
-  try {
-    const params = new URLSearchParams(initData);
-    const hash = params.get("hash");
-    if (!hash) return false;
-    params.delete("hash");
-
-    // Freshness check (replay protection)
-    const authDate = Number(params.get("auth_date") ?? 0);
-    if (!authDate || Date.now() / 1000 - authDate > AUTH_MAX_AGE_SEC) return false;
-
-    const dataCheckString = [...params.entries()]
-      .map(([k, v]) => `${k}=${v}`)
-      .sort()
-      .join("\n");
-    const secretKey = createHmac("sha256", "WebAppData").update(botToken).digest();
-    const computed = createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
-
-    const a = Buffer.from(computed, "hex");
-    const b = Buffer.from(hash, "hex");
-    return a.length === b.length && timingSafeEqual(a, b);
-  } catch {
-    return false;
-  }
-}
+// Telegram initData verification lives in ../lib/telegram-init-data.ts.
 
 /**
  * Jarvis Command Bridge

@@ -25,6 +25,16 @@ declare global {
 
 const tg = () => window.Telegram?.WebApp;
 
+// Every API call carries the signed Telegram session; the API accepts it (for the
+// Mini App's read routes only) when the user is on TELEGRAM_MINIAPP_USER_IDS.
+const tgFetch = (url: string, init: RequestInit = {}) => {
+  const initData = (window.Telegram?.WebApp as { initData?: string } | undefined)?.initData ?? "";
+  const headers = new Headers(init.headers);
+  if (initData) headers.set("X-Telegram-Init-Data", initData);
+  return fetch(url, { ...init, headers });
+};
+
+
 // ─── Matrix Eye (same as gabar.tsx) ──────────────────────────────────────────
 function MatrixEye({ active, size = 44 }: { active: boolean; size?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -136,9 +146,9 @@ export default function GeverMiniApp() {
   useEffect(() => {
     setThinking(true);
     Promise.all([
-      fetch(`${BASE}/api/clients`).then((r) => r.json()).catch(() => []),
-      fetch(`${BASE}/api/agents`).then((r) => r.json()).catch(() => []),
-      fetch(`${BASE}/api/logs?limit=50`).then((r) => r.json()).catch(() => []),
+      tgFetch(`${BASE}/api/clients`).then((r) => r.json()).catch(() => []),
+      tgFetch(`${BASE}/api/agents`).then((r) => r.json()).catch(() => []),
+      tgFetch(`${BASE}/api/logs?limit=50`).then((r) => r.json()).catch(() => []),
     ]).then(([cls, ags, lgs]) => {
       const clientList = Array.isArray(cls) ? cls : [];
       const agentList = Array.isArray(ags) ? ags : [];

@@ -30,3 +30,15 @@ describe("login limiter", () => {
     assert.ok(l.retryAfter("brand-new-ip") > 0);
   });
 });
+
+describe("limiter options", () => {
+  it("honours custom per-key and window limits", () => {
+    let t = 0;
+    const l = createLoginLimiter(() => t, { windowMs: 1000, maxPerKey: 2, maxGlobal: 100 });
+    l.recordFailure("a");
+    l.recordFailure("a");
+    assert.ok(l.retryAfter("a") > 0);
+    t += 1001;
+    assert.equal(l.retryAfter("a"), 0);
+  });
+});

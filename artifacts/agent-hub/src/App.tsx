@@ -1,43 +1,44 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AnimatePresence, motion } from "framer-motion";
-import NotFound from "@/pages/not-found";
+const NotFound = lazy(() => import("@/pages/not-found"));
 import { Layout } from "@/components/layout";
 import { ThemeProvider } from "@/components/theme-provider";
 import Dashboard from "@/pages/dashboard";
-import AgentsPage from "@/pages/agents";
-import AgentNew from "@/pages/agent-new";
-import AgentDetail from "@/pages/agent-detail";
-import ClientsPage from "@/pages/clients";
-import ClientNew from "@/pages/client-new";
-import ClientDetail from "@/pages/client-detail";
-import OrchestratorPage from "@/pages/orchestrator";
-import WorkflowsPage from "@/pages/workflows";
-import WorkflowCanvas from "@/pages/workflow-canvas";
-import ChatPage from "@/pages/chat";
-import SpecAgentPage from "@/pages/spec-agent";
-import LangAgentPage from "@/pages/lang-agent";
-import ConnectivityAgent from "@/pages/connectivity-agent";
-import LogsPage from "@/pages/logs";
-import MaintenanceAgentPage from "@/pages/maintenance-agent";
-import ClientLivePage from "@/pages/client-live";
-import OpenSourceHub from "@/pages/opensource-hub";
-import N8nTemplatesPage from "@/pages/n8n-templates";
-import WorkflowLibraryPage from "@/pages/workflow-library";
-import RpaConnectorsPage from "@/pages/rpa-connectors";
-import PalgatePage from "@/pages/palgate";
-import AgentSpecsPage from "@/pages/agent-specs";
-import SettingsPage from "@/pages/settings";
-import EmailLeadsPage from "@/pages/email-leads";
-import AorAcademy from "@/pages/aor-academy";
-import GeverMiniApp from "@/pages/gever-miniapp";
-import JarvisMiniApp from "@/pages/jarvis-miniapp";
-import ControlRoomPage from "@/pages/control-room";
-import Jarvis from "@/components/jarvis";
-import Gabar from "@/components/gabar";
+const AgentsPage = lazy(() => import("@/pages/agents"));
+const AgentNew = lazy(() => import("@/pages/agent-new"));
+const AgentDetail = lazy(() => import("@/pages/agent-detail"));
+const ClientsPage = lazy(() => import("@/pages/clients"));
+const ClientNew = lazy(() => import("@/pages/client-new"));
+const ClientDetail = lazy(() => import("@/pages/client-detail"));
+const OrchestratorPage = lazy(() => import("@/pages/orchestrator"));
+const WorkflowsPage = lazy(() => import("@/pages/workflows"));
+const WorkflowCanvas = lazy(() => import("@/pages/workflow-canvas"));
+const ChatPage = lazy(() => import("@/pages/chat"));
+const SpecAgentPage = lazy(() => import("@/pages/spec-agent"));
+const LangAgentPage = lazy(() => import("@/pages/lang-agent"));
+const ConnectivityAgent = lazy(() => import("@/pages/connectivity-agent"));
+const LogsPage = lazy(() => import("@/pages/logs"));
+const MaintenanceAgentPage = lazy(() => import("@/pages/maintenance-agent"));
+const ClientLivePage = lazy(() => import("@/pages/client-live"));
+const OpenSourceHub = lazy(() => import("@/pages/opensource-hub"));
+const N8nTemplatesPage = lazy(() => import("@/pages/n8n-templates"));
+const WorkflowLibraryPage = lazy(() => import("@/pages/workflow-library"));
+const RpaConnectorsPage = lazy(() => import("@/pages/rpa-connectors"));
+const PalgatePage = lazy(() => import("@/pages/palgate"));
+const AgentSpecsPage = lazy(() => import("@/pages/agent-specs"));
+const SettingsPage = lazy(() => import("@/pages/settings"));
+const EmailLeadsPage = lazy(() => import("@/pages/email-leads"));
+const AorAcademy = lazy(() => import("@/pages/aor-academy"));
+const GeverMiniApp = lazy(() => import("@/pages/gever-miniapp"));
+const JarvisMiniApp = lazy(() => import("@/pages/jarvis-miniapp"));
+const ControlRoomPage = lazy(() => import("@/pages/control-room"));
+// Disabled desktop voice assistants — re-enable together with their JSX below.
+// const Jarvis = lazy(() => import("@/components/jarvis"));
+// const Gabar = lazy(() => import("@/components/gabar"));
 import { GlobalSearch } from "@/components/global-search";
 import { AuthGate } from "@/components/auth-gate";
 
@@ -57,6 +58,16 @@ const pageVariants = {
 };
 
 const BASE_PATH = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+// Pages are code-split (one chunk each) so the first load doesn't pull the
+// whole 2MB app; this shows while a page's chunk downloads.
+function PageLoading() {
+  return (
+    <div className="flex h-full min-h-[40vh] items-center justify-center" dir="rtl">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent opacity-40" aria-label="טוען" />
+    </div>
+  );
+}
 
 function RedirectHome() {
   const [, setLocation] = useLocation();
@@ -80,6 +91,7 @@ function AppRoutes() {
           exit="exit"
           className="h-full"
         >
+          <Suspense fallback={<PageLoading />}>
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/login" component={RedirectHome} />
@@ -111,21 +123,22 @@ function AppRoutes() {
             <Route path="/control-room" component={ControlRoomPage} />
             <Route component={NotFound} />
           </Switch>
+          </Suspense>
         </motion.div>
       </AnimatePresence>
     </Layout>
   );
 }
 
-// The desktop Jarvis is the command EXECUTOR — it holds the SSE bridge and runs
-// commands arriving from Telegram. It must only mount on the real desktop app,
-// never inside the Telegram Mini App route (otherwise the Mini App would act as
-// a fake executor and could receive/run/report commands itself).
-function DesktopJarvis() {
-  const [location] = useLocation();
-  if (location === "/jarvis" || location === "/gever") return null;
-  return <Jarvis />;
-}
+// // The desktop Jarvis is the command EXECUTOR — it holds the SSE bridge and runs
+// // commands arriving from Telegram. It must only mount on the real desktop app,
+// // never inside the Telegram Mini App route (otherwise the Mini App would act as
+// // a fake executor and could receive/run/report commands itself).
+// function DesktopJarvis() {
+//   const [location] = useLocation();
+//   if (location === "/jarvis" || location === "/gever") return null;
+//   return <Jarvis />;
+// }
 
 // Global ⌘K / Ctrl+K search — only on the real desktop app, never inside the
 // full-screen Telegram Mini Apps or the personal Academy experience.
@@ -143,13 +156,13 @@ function RootRouter() {
   const [location] = useLocation();
 
   if (location === "/gever") {
-    return <GeverMiniApp />;
+    return <Suspense fallback={<PageLoading />}><GeverMiniApp /></Suspense>;
   }
   if (location === "/jarvis") {
-    return <JarvisMiniApp />;
+    return <Suspense fallback={<PageLoading />}><JarvisMiniApp /></Suspense>;
   }
   if (location === "/aor") {
-    return <AorAcademy />;
+    return <Suspense fallback={<PageLoading />}><AorAcademy /></Suspense>;
   }
 
   return (

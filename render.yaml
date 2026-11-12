@@ -63,6 +63,8 @@ services:
         sync: false
       - key: LOG_LEVEL
       # Optional — referenced in code; leave empty to disable the feature.
+      - key: TELEGRAM_MINIAPP_USER_IDS  # Telegram user ids allowed in /gever /jarvis (comma-separated)
+        sync: false
       - key: EMAIL_INBOUND_SECRET   # when set, /api/email/inbound requires header x-inbound-secret
         sync: false
       - key: FRONTEND_ORIGIN        # extra allowed CORS origin (custom domain)

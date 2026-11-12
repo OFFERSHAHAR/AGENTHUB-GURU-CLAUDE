@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { conversationsTable, agentsTable, clientsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { publicChatLimiter } from "../lib/login-limiter";
 
 const router = Router();
 
@@ -12,8 +13,17 @@ const router = Router();
  * Returns: { convId: number, agentName: string }
  */
 router.post("/public/chat/start", async (req, res): Promise<void> => {
+  const limitKey = req.ip || "unknown";
+  const wait = publicChatLimiter.retryAfter(limitKey);
+  if (wait > 0) {
+    res.setHeader("Retry-After", String(wait));
+    res.status(429).json({ error: "too_many_requests", retryAfterSeconds: wait });
+    return;
+  }
+  publicChatLimiter.recordFailure(limitKey); // every call counts toward the cap
   const agentId = parseInt(req.body?.agentId, 10);
-  const guestName: string = req.body?.guestName?.trim() || "אורח";
+  const rawName = typeof req.body?.guestName === "string" ? req.body.guestName.trim() : "";
+  const guestName: string = rawName.slice(0, 60) || "אורח";
 
   if (!agentId || isNaN(agentId)) {
     res.status(400).json({ error: "agentId required" });

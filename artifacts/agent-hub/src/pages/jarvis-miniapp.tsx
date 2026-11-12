@@ -25,6 +25,16 @@ declare global {
 
 const tg = () => window.Telegram?.WebApp;
 
+// Every API call carries the signed Telegram session; the API accepts it (for the
+// Mini App's read routes only) when the user is on TELEGRAM_MINIAPP_USER_IDS.
+const tgFetch = (url: string, init: RequestInit = {}) => {
+  const initData = (window.Telegram?.WebApp as { initData?: string } | undefined)?.initData ?? "";
+  const headers = new Headers(init.headers);
+  if (initData) headers.set("X-Telegram-Init-Data", initData);
+  return fetch(url, { ...init, headers });
+};
+
+
 // ─── STARK palette ─────────────────────────────────────────────────────────────
 const CYAN = "#00e5ff";
 const BLUE = "#0d47a1";
@@ -131,7 +141,7 @@ export default function JarvisMiniApp() {
     let cancelled = false;
     const check = async () => {
       try {
-        const r = await fetch(`${BASE}/api/jarvis/status`);
+        const r = await tgFetch(`${BASE}/api/jarvis/status`);
         const d = await r.json();
         if (!cancelled) setDesktopConnected(Boolean(d.desktopConnected));
       } catch {
@@ -151,7 +161,7 @@ export default function JarvisMiniApp() {
       while (Date.now() - start < POLL_TIMEOUT_MS) {
         await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
         try {
-          const r = await fetch(`${BASE}/api/jarvis/result/${commandId}`);
+          const r = await tgFetch(`${BASE}/api/jarvis/result/${commandId}`);
           if (r.status === 404) return { result: "הפקודה פגה. נסה שוב, מר סטארק.", confirm: null, choices: null };
           const d = await r.json();
           if (d.status === "done") return { result: d.result || "בוצע.", confirm: d.confirm ?? null, choices: d.choices ?? null };
@@ -174,7 +184,7 @@ export default function JarvisMiniApp() {
     if (refreshInFlightRef.current) return;
     refreshInFlightRef.current = true;
     try {
-      const r = await fetch(`${BASE}/api/jarvis/command`, {
+      const r = await tgFetch(`${BASE}/api/jarvis/command`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: "רענון סטטוס", action: "refresh_choices", initData: (tg() as { initData?: string } | undefined)?.initData ?? "" }),
@@ -187,7 +197,7 @@ export default function JarvisMiniApp() {
         await new Promise((res) => setTimeout(res, 600));
         let res2: Response;
         try {
-          res2 = await fetch(`${BASE}/api/jarvis/result/${d.commandId}`);
+          res2 = await tgFetch(`${BASE}/api/jarvis/result/${d.commandId}`);
         } catch {
           continue;
         }
@@ -239,7 +249,7 @@ export default function JarvisMiniApp() {
     async (text: string, action?: "confirm_trigger" | "cancel_trigger" | "select_trigger", choiceIndex?: number) => {
       setThinking(true);
       try {
-        const r = await fetch(`${BASE}/api/jarvis/command`, {
+        const r = await tgFetch(`${BASE}/api/jarvis/command`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text, action, choiceIndex, initData: (tg() as { initData?: string } | undefined)?.initData ?? "" }),

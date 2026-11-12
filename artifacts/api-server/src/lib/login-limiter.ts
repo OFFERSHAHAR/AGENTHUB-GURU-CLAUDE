@@ -14,12 +14,21 @@ export const MAX_GLOBAL = 40;
 
 interface Bucket { count: number; resetAt: number }
 
-export function createLoginLimiter(now: () => number = Date.now) {
+export interface LimiterOptions {
+  windowMs?: number;
+  maxPerKey?: number;
+  maxGlobal?: number;
+}
+
+export function createLoginLimiter(
+  now: () => number = Date.now,
+  { windowMs = WINDOW_MS, maxPerKey = MAX_PER_KEY, maxGlobal = MAX_GLOBAL }: LimiterOptions = {},
+) {
   const perKey = new Map<string, Bucket>();
   let global: Bucket = { count: 0, resetAt: 0 };
 
   const fresh = (b: Bucket | undefined): Bucket =>
-    !b || b.resetAt <= now() ? { count: 0, resetAt: now() + WINDOW_MS } : b;
+    !b || b.resetAt <= now() ? { count: 0, resetAt: now() + windowMs } : b;
 
   return {
     /** Seconds until the caller may retry, or 0 if allowed. */
@@ -27,8 +36,8 @@ export function createLoginLimiter(now: () => number = Date.now) {
       global = fresh(global);
       const b = fresh(perKey.get(key));
       const until =
-        global.count >= MAX_GLOBAL ? global.resetAt
-        : b.count >= MAX_PER_KEY ? b.resetAt
+        global.count >= maxGlobal ? global.resetAt
+        : b.count >= maxPerKey ? b.resetAt
         : 0;
       return until ? Math.max(1, Math.ceil((until - now()) / 1000)) : 0;
     },
@@ -49,3 +58,10 @@ export function createLoginLimiter(now: () => number = Date.now) {
 }
 
 export const loginLimiter = createLoginLimiter();
+
+// Anonymous POST /public/chat/start writes a DB row per call: cap it.
+export const publicChatLimiter = createLoginLimiter(Date.now, {
+  windowMs: 60 * 60 * 1000,
+  maxPerKey: 10,
+  maxGlobal: 200,
+});

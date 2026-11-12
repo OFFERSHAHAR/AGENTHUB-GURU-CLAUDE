@@ -1,97 +1,67 @@
-# DEPLOY — פריסת ההאב ל-Railway (Runbook)
+# DEPLOY — פריסת AgentHub ב-Render (Runbook)
 
-מסמך הפעלה לפריסת ה-monorepo (agent-hub + api-server + Postgres) מחוץ ל-Replit.
-כל קבצי הפריסה כבר מוכנים בריפו: `Dockerfile`, `deploy/Caddyfile`, `deploy/start.sh`,
-`railway.json`, `.dockerignore`, `.env.example`.
+הפריסה בפועל: **Render, ללא Docker**, לפי `render.yaml`. מסד הנתונים ב-**Neon**.
+(מסמכי Railway / Docker / Caddy הישנים הוסרו — הם לא משקפים את המצב.)
 
 ## ארכיטקטורה
 ```
-                 ┌────────────────── קונטיינר אחד ──────────────────┐
-משתמש ──HTTPS──▶ │  Caddy ( :$PORT )                                 │
-                 │   ├── /api/*  ──▶ api-server (node, :5000)  ──▶ Postgres
-                 │   └── /*      ──▶ קבצים סטטיים (agent-hub SPA)     │
-                 └──────────────────────────────────────────────────┘
+משתמש ──▶ agenthub-guru-claude (Static Site — artifacts/agent-hub)
+             ├── /api/*  ──rewrite──▶ agenthub-guru-claude-api (Node — artifacts/api-server) ──▶ Neon Postgres
+             └── /*      ──▶ index.html (SPA)
 ```
-ה-frontend קורא ל-API ב-origin יחסי (`/api`), לכן Caddy מאחד את שניהם לדומיין אחד.
+ה-rewrite שומר origin אחד, ולכן עוגיית ההתחברות היא first-party.
 
-## דרישות מקדימות
-- חשבון Railway + טוקן (Account Settings → Tokens) — או Railway CLI מחובר.
-- הסודות מ-`.env.example` (לפחות החובה).
-- DB ייווצר ע"י תוסף Postgres של Railway.
+## פריסה רגילה
+- כל push ל-`main` אמור לפרוס את שני השירותים (`autoDeploy: true`).
+- לפני כן רץ ב-GitHub ה-workflow
+  `ci`
+  (typecheck, בנייה, בדיקות). אדום = לא לפרוס.
+- **אם Render לא פרס** (האתר נשאר על גרסה ישנה):
+  Render Dashboard ▸ השירות ▸ **Manual Deploy ▸ Deploy latest commit** — לשני השירותים.
+  אם זה חוזר: Settings ▸ Build & Deploy ▸ ודא ש-Auto-Deploy מופעל ושהריפו מחובר.
 
-## שלבים
-
-### 1. ריפו ל-Git (Railway פורס מ-Git או מ-Docker)
+## בדיקות אחרי פריסה
 ```bash
-cd Review-Metrics-Roadmap
-git init && git add . && git commit -m "deploy: railway docker setup"
-# דחוף ל-GitHub (פרטי) או השתמש ב-`railway up` מקומי
+curl https://agenthub-guru-claude-api.onrender.com/api/healthz/db
 ```
+מצופה: `{"status":"ok","db":"ok",...}`. ‏503 = ה-API חי אבל אין חיבור למסד.
+- עמוד הבית נטען ומציג את שער הכניסה.
+- התחברות עובדת. אחרי 8 ניסיונות שגויים מאותה כתובת: 429 למשך 15 דקות.
 
-### 2. יצירת פרויקט + Postgres
-- ב-Railway: New Project → Deploy from Repo (או `railway init`).
-- Add → Database → **PostgreSQL**. Railway יספק `DATABASE_URL` כמשתנה משותף.
-
-### 3. הזרקת משתני סביבה
-- העתק את הערכים מ-`.env.example` ל-Variables של השירות.
-- `DATABASE_URL` — קשר ל-Postgres שנוצר (Reference Variable).
-- אל תגדיר `PORT` ידנית — Railway מזריק; Caddy משתמש בו אוטומטית.
-
-### 4. פריסה
-- Railway יזהה את `Dockerfile` (דרך `railway.json`) ויבנה. הבנייה רצה ב-Linux —
-  כך נפתר ה-pinning ל-linux-x64.
-- בדוק לוגים: `[start] api-server` ואז `[start] Caddy מאזין`.
-
-### 5. דחיפת סכימת DB (פעם ראשונה)
-מתוך shell של הפריסה או מקומית מול ה-DATABASE_URL:
-```bash
-pnpm --filter @workspace/db run push
-```
-
-### 6. דומיין
-- Railway → Settings → Networking → Generate Domain (או Custom Domain).
-- עדכן `APP_BASE_URL` לכתובת הסופית.
-
-## ✅ בדיקות קבלה
-- [ ] עמוד הבית של ההאב נטען
-- [ ] קריאת `/api/...` מחזירה JSON (לא דף ה-SPA)
-- [ ] התחברות/שער גישה עובד
-- [ ] אין שגיאות DB בלוגים
-
-## ⚠️ נקודות לתשומת לב
-1. **Google Sheets (שלב 2):** `@replit/connectors-sdk` הוא Replit-only — מסלולי
-   Sheets (telegram.ts, sheets-reader, palgate) ייכשלו עד שנחליף ל-Google
-   Service Account. שאר המערכת תעבוד.
-2. **נתיבי backend לא תחת /api:** ב-`deploy/Caddyfile` יש רשימת נתיבים נוספים
-   (/healthz, /webhooks, /telegram). ודא מול הקוד והתאם אם צריך.
-3. **lockfile drift:** אם `pnpm install --frozen-lockfile` נכשל בבנייה — שנה ב-Dockerfile
-   ל-`--no-frozen-lockfile`.
-4. **minimumReleaseAge=1440** ב-pnpm-workspace — בנייה רגילה לא מושפעת (חבילות ישנות).
-
-## מסלול Render (Blueprint) — היעד הנבחר ✅
-קובץ `render.yaml` כבר מגדיר הכל: שירות Docker + Postgres מנוהל + משתני הסביבה.
-
-1. **דחיפת הקוד ל-GitHub** (Render פורס מ-Git):
+## סכימת מסד הנתונים
+הסכימה ב-`lib/db/src/schema`. אין מיגרציות — יש `drizzle-kit push`, ו**הוא לא רץ אוטומטית בפריסה**
+(בכוונה: push לא-אינטראקטיבי יכול למחוק עמודות). אחרי שינוי סכימה:
+1. צור ב-Neon branch לגיבוי.
+2. מקומית, מול ה-DATABASE_URL של פרודקשן:
    ```bash
-   cd Review-Metrics-Roadmap
-   rm -rf .git                       # מנקה את ה-remotes הישנים של Replit
-   git init && git add . && git commit -m "deploy: render blueprint"
-   git branch -M main
-   git remote add origin https://github.com/<user>/<repo>.git
-   git push -u origin main
+   pnpm --filter @workspace/db run push
    ```
-2. **Render Dashboard** → **New** → **Blueprint** → חבר את הריפו → Render קורא `render.yaml`.
-3. מלא את הסודות המסומנים `sync: false` (RESEND, TELEGRAM, OPENAI, סיסמאות...).
-   `DATABASE_URL` ו-`SESSION_SECRET` נוצרים אוטומטית.
-4. **Apply** → Render בונה (Docker, ב-Linux) ופורס. עקוב אחרי הלוגים.
-5. **db push** — מתוך Render Shell של השירות: `pnpm --filter @workspace/db run push`
-6. דומיין: Render נותן `*.onrender.com`; עדכן `APP_BASE_URL`. (אפשר דומיין מותאם.)
+3. קרא את מה ש-drizzle מציג לפני אישור. אם הוא מציע מחיקה — עצור.
 
-### הערות Render
-- `plan: free` ל-DB פג אחרי 90 יום — לפרודקשן שדרג ל-`starter`.
-- שירות Docker דורש plan בתשלום (starter); free לא תומך ב-Docker רציף.
-- Render מזריק `PORT` → Caddy מאזין עליו אוטומטית.
+## משתני סביבה (שירות ה-API)
+חובה: `DATABASE_URL`, `SESSION_SECRET`, `APP_ACCESS_PASSWORD` (+ `AOR_ACCESS_PASSWORD`).
+אופציונלי (הפיצ'ר כבוי בלעדיהם):
+| משתנה | מה הוא עושה |
+|---|---|
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ADMIN_TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET` | בוט טלגרם והתראות |
+| `TELEGRAM_MINIAPP_USER_IDS` | מזהי משתמשי טלגרם (פסיקים) שמורשים במיני-אפליקציות `/gever` `/jarvis`. ריק = מזהי הצ'אט של המנהלים |
+| `EMAIL_INBOUND_SECRET` | כשמוגדר, `/api/email/inbound` דורש כותרת `x-inbound-secret` |
+| `FRONTEND_ORIGIN` | דומיין נוסף ל-CORS |
+| `GITHUB_TOKEN` | כוכבי GitHub בעמוד הקוד הפתוח |
+| `RESEND_*`, `OPENAI_API_KEY`, `GROQ_API_KEY`, `WHATSAPP_*`, `N8N_BASE_URL`, `OLLAMA_*` | אינטגרציות |
 
-## חלופות נוספות
-- **Railway:** `railway.json` קיים; New Project → Repo + תוסף Postgres.
-- **Fly.io:** `fly launch` עם ה-Dockerfile; Postgres דרך `fly postgres`.
+## שמירה על השרת ער (free plan)
+- השרת עושה self-ping כל 4 דק' ל-`/api/healthz/db` (מעיר גם את Neon).
+- workflow
+  `keep-alive`
+  ב-GitHub כל 5 דק'. GitHub משהה workflows מתוזמנים אחרי 60 יום בלי פעילות בריפו — אם הפינג נעלם, הפעל מחדש ב-Actions.
+
+## בנייה מקומית ב-Windows
+ה-workspace נעול לבינארים של Linux, ולכן `vite build` נכשל מקומית ב-Windows.
+אם צריך: התקן בתיקייה זמנית את
+`@rollup/rollup-win32-x64-msvc`, `lightningcss-win32-x64-msvc`, `@tailwindcss/oxide-win32-x64-msvc`
+(באותן גרסאות), הגדר `NODE_PATH` אליה, ובגיט-באש הוסף `MSYS_NO_PATHCONV=1` כדי ש-`BASE_PATH=/` לא יהפוך לנתיב Windows.
+
+## ידוע ופתוח
+- Google Sheets דרך `@replit/connectors-sdk` עובד רק ב-Replit — סנכרון גיליונות (palgate / sheets-reader) לא יעבוד ב-Render עד מעבר ל-Service Account.
+- `artifacts/agent-hub-mobile`, `client-intake`, `ops-guide`, `product-review`, `study-listener` לא נפרסים.
