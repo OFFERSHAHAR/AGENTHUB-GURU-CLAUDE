@@ -187,7 +187,7 @@ function ScanLines() {
 
 function WebcamEye({ streaming, videoRef, knownPerson }: {
   streaming: boolean;
-  videoRef: React.RefObject<HTMLVideoElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   knownPerson: KnownPerson;
 }) {
   const streamRef = useRef<MediaStream | null>(null);
@@ -611,7 +611,7 @@ export default function Jarvis() {
   const desktopTriggerRef = useRef<DesktopTrigger | null>(null);
   useEffect(() => { desktopTriggerRef.current = desktopTrigger; }, [desktopTrigger]);
 
-  const recognRef = useRef<SpeechRecognition | null>(null);
+  const recognRef = useRef<any>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   const addLog = useCallback((text: string, type: LogEntry["type"] = "sys") => {
@@ -1193,8 +1193,8 @@ export default function Jarvis() {
     recog.onstart = () => { setListening(true); beep(440, 0.1); };
     recog.onend = () => setListening(false);
     recog.onerror = () => setListening(false);
-    recog.onresult = (e) => {
-      const result = Array.from(e.results).map((r) => r[0].transcript).join("");
+    recog.onresult = (e: any) => {
+      const result = Array.from(e.results as ArrayLike<any>).map((r) => r[0].transcript).join("");
       setTranscript(result);
       if (e.results[e.results.length - 1].isFinal) { setTranscript(""); handleCmd(result); }
     };

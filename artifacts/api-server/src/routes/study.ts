@@ -63,7 +63,7 @@ router.post("/study/transcribe", express.raw({ type: "*/*", limit: "25mb" }), as
     const filename = `chunk.${ext}`;
 
     const formData = new FormData();
-    const blob = new Blob([rawBody], { type: contentType });
+    const blob = new Blob([new Uint8Array(rawBody)], { type: contentType });
     formData.append("file", blob, filename);
     formData.append("model", "whisper-1");
 

@@ -45,7 +45,7 @@ interface RecommendedMethod {
   security: number;
   complexity: number;
   scalability: number;
-  icon: React.FC<{ className?: string }>;
+  icon: React.FC<{ className?: string; style?: React.CSSProperties }>;
   code: string;
   zeroTrustNotes: string[];
 }
@@ -474,7 +474,7 @@ curl -X POST http://debezium:8083/connectors -H 'Content-Type: application/json'
     "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
     "database.hostname": "your-db.internal",
     "database.user": "agenthub_readonly",
-    "database.password": "${DB_READONLY_PASSWORD}",
+    "database.password": "\${DB_READONLY_PASSWORD}",
     "database.dbname": "production",
     "table.include.list": "public.clients,public.orders",
     "snapshot.mode": "initial",

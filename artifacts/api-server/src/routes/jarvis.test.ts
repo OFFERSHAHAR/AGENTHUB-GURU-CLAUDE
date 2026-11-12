@@ -124,7 +124,7 @@ class FakeDesktop {
     const deadline = Date.now() + 3000;
     while (Date.now() < deadline) {
       try {
-        const s = await fetch(`${this.baseUrl}/api/jarvis/status`).then((r) => r.json());
+        const s = await fetch(`${this.baseUrl}/api/jarvis/status`).then((r) => r.json() as any);
         if (!s.connections) break;
       } catch {
         break;
@@ -165,7 +165,7 @@ async function postCommand(body: unknown) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  return { status: res.status, json: await res.json() };
+  return { status: res.status, json: (await res.json()) as any };
 }
 
 async function postResult(body: unknown) {
@@ -174,12 +174,12 @@ async function postResult(body: unknown) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  return { status: res.status, json: await res.json() };
+  return { status: res.status, json: (await res.json()) as any };
 }
 
 async function poll(commandId: string) {
   const res = await fetch(`${baseUrl}/api/jarvis/result/${commandId}`);
-  return { status: res.status, json: await res.json() };
+  return { status: res.status, json: (await res.json()) as any };
 }
 
 describe("jarvis bridge — command broadcast", () => {
@@ -407,11 +407,11 @@ describe("jarvis bridge — executor-token gating on results", () => {
 
 describe("jarvis bridge — status endpoint", () => {
   it("reports whether a desktop is listening", async () => {
-    const before = await fetch(`${baseUrl}/api/jarvis/status`).then((r) => r.json());
+    const before = await fetch(`${baseUrl}/api/jarvis/status`).then((r) => r.json() as any);
     const baseline = before.connections as number;
     const desk = await FakeDesktop.connect(baseUrl);
     try {
-      const during = await fetch(`${baseUrl}/api/jarvis/status`).then((r) => r.json());
+      const during = await fetch(`${baseUrl}/api/jarvis/status`).then((r) => r.json() as any);
       assert.equal(during.desktopConnected, true);
       assert.ok(during.connections > baseline);
     } finally {

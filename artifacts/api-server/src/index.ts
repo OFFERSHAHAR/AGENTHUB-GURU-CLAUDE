@@ -16,7 +16,7 @@ const SELF_PING_INTERVAL_MS = 4 * 60 * 1000; // < Render's ~15 min idle window
 function startSelfPing(): void {
   const base = process.env.RENDER_EXTERNAL_URL || process.env.APP_BASE_URL;
   if (!base || process.env.NODE_ENV === "test") return;
-  const url = `${base.replace(/\/$/, "")}/api/stats/summary`;
+  const url = `${base.replace(/\/$/, "")}/api/healthz/db`;
   setInterval(() => {
     fetch(url).catch(() => {});
   }, SELF_PING_INTERVAL_MS).unref();

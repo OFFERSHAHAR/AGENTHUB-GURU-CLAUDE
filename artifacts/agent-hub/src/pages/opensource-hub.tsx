@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { useListAgents, useUpdateAgent, getListAgentsQueryKey } from "@workspace/api-client-react";
+import { useListAgents, useUpdateAgent, getListAgentsQueryKey, type Agent } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -141,7 +141,7 @@ function CapChip({ cap }: { cap: string }) {
 }
 
 // ─── Agent Card ───────────────────────────────────────────────────────────────
-function AgentCard({ agent }: { agent: ReturnType<typeof useListAgents>["data"] extends (infer T)[] | undefined ? T : never }) {
+function AgentCard({ agent }: { agent: Agent }) {
   const [expanded, setExpanded] = useState(false);
   const [localTemp, setLocalTemp] = useState<number>(agent.temperature ?? 0.7);
   const [localModel, setLocalModel] = useState<string>(agent.model ?? "gpt-4o");
@@ -163,7 +163,7 @@ function AgentCard({ agent }: { agent: ReturnType<typeof useListAgents>["data"] 
     });
     return () => { alive = false; };
   }, [meta.github]);
-  const caps: string[] = (() => { try { return JSON.parse(agent.capabilities || "[]"); } catch { return []; } })();
+  const caps: string[] = Array.isArray(agent.capabilities) ? agent.capabilities : (() => { try { return JSON.parse((agent.capabilities as unknown as string) || "[]"); } catch { return []; } })();
   const isDirty = localTemp !== (agent.temperature ?? 0.7) || localModel !== (agent.model ?? "gpt-4o") || localMemory !== (agent.memoryType ?? "none") || localTimeout !== (agent.timeout ?? 60);
 
   const handleSave = () => {

@@ -17,6 +17,14 @@ import { eq } from "drizzle-orm";
 import triggersRouter from "./triggers.js";
 import { publishTriggerEvent } from "../lib/trigger-events-bus.js";
 
+// Integration test: needs a real Postgres with the schema pushed. Point
+// TEST_DATABASE_URL (and DATABASE_URL) at a throwaway Neon branch to run it.
+const SKIP_DB = !process.env.TEST_DATABASE_URL;
+
+// Events now carry the durable trigger_events.id; tests supply a monotonic one.
+let testEventSeq = 9_000_000;
+const nextTestEventId = () => ++testEventSeq;
+
 // ── Minimal app: mount ONLY the triggers router so we exercise the real SSE
 // route + webhook handler without booting the whole server (schedulers, etc).
 function buildApp() {
@@ -85,7 +93,7 @@ after(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
-describe("GET /clients/:id/trigger/stream — live SSE", () => {
+describe("GET /clients/:id/trigger/stream — live SSE", { skip: SKIP_DB && "set TEST_DATABASE_URL to run" }, () => {
   it("delivers each live fire with a strictly increasing id: frame", async () => {
     const clientId = 920101;
     const ctrl = new AbortController();
@@ -99,7 +107,7 @@ describe("GET /clients/:id/trigger/stream — live SSE", () => {
     // so any fire published after the response headers arrive is captured.
     const framesPromise = readFrames(res, 3);
     for (let i = 0; i < 3; i++) {
-      publishTriggerEvent({
+      publishTriggerEvent({ id: nextTestEventId(),
         clientId,
         assignmentId: 1,
         triggerId: 7,
@@ -136,9 +144,9 @@ describe("GET /clients/:id/trigger/stream — live SSE", () => {
 
     const framesPromise = readFrames(res, 1);
     // An event for a different client must be filtered out...
-    publishTriggerEvent({ clientId: otherClientId, assignmentId: 1, triggerId: 1, agentStatus: "triggered", firedAt: new Date().toISOString() });
+    publishTriggerEvent({ id: nextTestEventId(), clientId: otherClientId, assignmentId: 1, triggerId: 1, agentStatus: "triggered", firedAt: new Date().toISOString() });
     // ...only this one should reach the stream.
-    publishTriggerEvent({ clientId, assignmentId: 1, triggerId: 9, agentStatus: "triggered", firedAt: new Date().toISOString() });
+    publishTriggerEvent({ id: nextTestEventId(), clientId, assignmentId: 1, triggerId: 9, agentStatus: "triggered", firedAt: new Date().toISOString() });
 
     const frames = await framesPromise;
     ctrl.abort();
@@ -149,7 +157,7 @@ describe("GET /clients/:id/trigger/stream — live SSE", () => {
   });
 });
 
-describe("GET /clients/:id/trigger/stream — Last-Event-ID replay after a drop", () => {
+describe("GET /clients/:id/trigger/stream — Last-Event-ID replay after a drop", { skip: SKIP_DB && "set TEST_DATABASE_URL to run" }, () => {
   it("replays a webhook fire missed while disconnected, with matching id: frames", async () => {
     // Seed a real client → agent → assignment → trigger so we can fire the
     // actual inbound webhook endpoint (not just the bus directly).
@@ -224,8 +232,8 @@ describe("GET /clients/:id/trigger/stream — Last-Event-ID replay after a drop"
     const clientId = 920201;
     const otherClientId = 920202;
     // Buffer events for two clients with no stream connected.
-    publishTriggerEvent({ clientId: otherClientId, assignmentId: 1, triggerId: 1, agentStatus: "triggered", firedAt: new Date().toISOString() });
-    publishTriggerEvent({ clientId, assignmentId: 2, triggerId: 42, agentStatus: "triggered", firedAt: new Date().toISOString() });
+    publishTriggerEvent({ id: nextTestEventId(), clientId: otherClientId, assignmentId: 1, triggerId: 1, agentStatus: "triggered", firedAt: new Date().toISOString() });
+    publishTriggerEvent({ id: nextTestEventId(), clientId, assignmentId: 2, triggerId: 42, agentStatus: "triggered", firedAt: new Date().toISOString() });
 
     const ctrl = new AbortController();
     const res = await fetch(`${baseUrl}/api/clients/${clientId}/trigger/stream`, {
@@ -316,7 +324,7 @@ async function seedDedupEvents(firedAts: Date[]) {
   return { client, agent, assignment, trigger, cleanup };
 }
 
-describe("GET /clients/:id/trigger-stats — dedup breakdown bucketing", () => {
+describe("GET /clients/:id/trigger-stats — dedup breakdown bucketing", { skip: SKIP_DB && "set TEST_DATABASE_URL to run" }, () => {
   it("uses hourly buckets for a sub-day (6h) window and places counts per ISO hour", async () => {
     const HOUR = 60 * 60 * 1000;
     // Pin firedAt to minute 30 of each target hour so the few ms of clock drift
@@ -334,7 +342,7 @@ describe("GET /clients/:id/trigger-stats — dedup breakdown bucketing", () => {
     try {
       const res = await fetch(`${baseUrl}/api/clients/${client.id}/trigger-stats`);
       assert.equal(res.status, 200);
-      const body = await res.json();
+      const body = (await res.json()) as any;
 
       assert.equal(body.breakdownUnit, "hour");
       assert.equal(body.windowHours, 6);
@@ -375,7 +383,7 @@ describe("GET /clients/:id/trigger-stats — dedup breakdown bucketing", () => {
 
     try {
       const res = await fetch(`${baseUrl}/api/clients/${client.id}/trigger-stats`);
-      const body = await res.json();
+      const body = (await res.json()) as any;
 
       assert.equal(body.breakdownUnit, "hour");
       assert.equal(body.dailyBreakdown.length, 6);
@@ -413,7 +421,7 @@ describe("GET /clients/:id/trigger-stats — dedup breakdown bucketing", () => {
 
     try {
       const res = await fetch(`${baseUrl}/api/clients/${client.id}/trigger-stats`);
-      const body = await res.json();
+      const body = (await res.json()) as any;
 
       assert.equal(body.breakdownUnit, "day");
       assert.equal(body.windowHours, 48);
@@ -448,7 +456,7 @@ describe("GET /clients/:id/trigger-stats — dedup breakdown bucketing", () => {
 
     try {
       const res = await fetch(`${baseUrl}/api/clients/${client.id}/trigger-stats`);
-      const body = await res.json();
+      const body = (await res.json()) as any;
 
       assert.equal(body.breakdownUnit, "hour");
       const row = body.perAssignment.find(

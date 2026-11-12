@@ -454,7 +454,7 @@ router.post("/telegram/webhook", async (req, res): Promise<void> => {
     //   "/שלח לעופר <טקסט>"         → send that text to the manager.
     //   "/שלח לאור"  (ריק)          → forward the user's recent messages.
     const sendMatch = text.match(/^\/שלח\s+ל(\S+)/u)
-      ?? (text.toLowerCase().startsWith("/sendor") ? ([, "אור"] as RegExpMatchArray) : null);
+      ?? (text.toLowerCase().startsWith("/sendor") ? ([, "אור"] as unknown as RegExpMatchArray) : null);
     if (sendMatch) {
       const recipient = RECIPIENTS.find(r => r.aliases.includes(sendMatch[1]));
       if (!recipient) {

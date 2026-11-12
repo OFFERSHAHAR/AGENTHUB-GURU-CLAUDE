@@ -448,7 +448,7 @@ function SpeechWave({ active, color = "#7c3aed" }: { active: boolean; color?: st
 
 // ─── Camera preview ───────────────────────────────────────────────────────────
 function CameraPreview({ videoRef, handDetected }: {
-  videoRef: React.RefObject<HTMLVideoElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   handDetected: boolean;
 }) {
   return (
@@ -488,7 +488,7 @@ function useHandGesture({
   onRelease,
 }: {
   enabled: boolean;
-  videoRef: React.RefObject<HTMLVideoElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   onMove: (nx: number, ny: number) => void;
   onGrab: () => void;
   onRelease: () => void;
@@ -1000,7 +1000,7 @@ export default function Gabar() {
     rec.lang = langPref === "en" ? "en-US" : langPref === "he" ? "he-IL" : "he-IL";
     rec.interimResults = false; rec.maxAlternatives = 1;
     setListening(true);
-    rec.onresult = (e) => {
+    rec.onresult = (e: any) => {
       const said = e.results[0][0].transcript;
       setListening(false);
       setResponse(R[resolveLang(said)].listened(said));

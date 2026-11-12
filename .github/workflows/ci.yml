@@ -1,0 +1,33 @@
+name: ci
+
+# Gate every push / PR to main: typecheck the whole workspace, build the two
+# deployed apps, and run the unit tests. Render auto-deploys main, so a red
+# run here means "don't trust that deploy".
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: corepack enable
+      - run: pnpm install --no-frozen-lockfile
+      - name: Typecheck
+        run: pnpm run typecheck:libs && pnpm --filter @workspace/api-server --filter @workspace/agent-hub exec tsc -p tsconfig.json --noEmit
+        env: { NODE_OPTIONS: --max-old-space-size=4096 }
+      - name: Build API
+        run: pnpm --filter @workspace/api-server build
+      - name: Build frontend
+        run: pnpm --filter @workspace/agent-hub build
+        env: { PORT: "3000", BASE_PATH: "/", NODE_ENV: production }
+      - name: Unit tests
+        run: pnpm test

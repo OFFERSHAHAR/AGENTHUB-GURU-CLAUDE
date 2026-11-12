@@ -147,7 +147,7 @@ const EVENT_ICONS: Record<string, string> = {
 };
 
 function HighDedupBanner() {
-  const { data } = useGetTriggerStatsSummary({ query: { refetchInterval: 60_000 } });
+  const { data } = useGetTriggerStatsSummary({ query: { refetchInterval: 60_000, queryKey: getGetTriggerStatsSummaryQueryKey() } });
   if (!data || data.highDedupCount === 0) return null;
 
   const firstClientId = data.affectedClients[0]?.clientId;

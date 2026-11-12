@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { loginLimiter } from "../lib/login-limiter";
 import { timingSafeEqual } from "node:crypto";
 
 const router: IRouter = Router();
@@ -61,6 +62,13 @@ router.get("/auth/session", (req, res) => {
 });
 
 router.post("/auth/login", (req, res) => {
+  const limitKey = req.ip || "unknown";
+  const wait = loginLimiter.retryAfter(limitKey);
+  if (wait > 0) {
+    res.setHeader("Retry-After", String(wait));
+    res.status(429).json({ error: "too_many_attempts", retryAfterSeconds: wait });
+    return;
+  }
   const configured = USERS.some((u) => u.getPassword());
   if (!configured) {
     res.status(503).json({ error: "auth_not_configured" });
@@ -74,9 +82,11 @@ router.post("/auth/login", (req, res) => {
   }
   const matched = findUser(password);
   if (!matched) {
+    loginLimiter.recordFailure(limitKey);
     res.status(401).json({ error: "invalid_password" });
     return;
   }
+  loginLimiter.recordSuccess(limitKey);
   res.cookie(COOKIE_NAME, matched.username, cookieOptions());
   res.json({ authenticated: true, user: matched.username, displayName: matched.displayName });
 });

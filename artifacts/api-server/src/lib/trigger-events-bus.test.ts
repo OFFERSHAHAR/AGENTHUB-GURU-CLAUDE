@@ -3,106 +3,63 @@ import assert from "node:assert/strict";
 import {
   publishTriggerEvent,
   subscribeTriggerEvents,
-  getEventsSince,
+  getMissedEvents,
   type TriggerBusEnvelope,
 } from "./trigger-events-bus.js";
 
-// Each test uses a distinct synthetic clientId so the per-client ring buffers
-// never overlap with another test's events (the seq counter is process-wide).
+// Unit tests for the in-process bus. Event ids are the durable
+// trigger_events.id, so the tests supply them. Every getMissedEvents call here
+// is served from the in-memory ring (fast path) — no database is touched.
+// Each test uses its own synthetic clientId so ring buffers never overlap.
+
+const ev = (clientId: number, id: number): TriggerBusEnvelope => ({
+  id,
+  clientId,
+  assignmentId: 1,
+  triggerId: 1,
+  agentStatus: "triggered",
+  firedAt: new Date().toISOString(),
+});
 
 describe("trigger-events-bus", () => {
-  it("assigns a strictly increasing, monotonic id to every published event", () => {
+  it("delivers published events to subscribers and stops after unsubscribe", () => {
     const clientId = 910001;
-    const received: TriggerBusEnvelope[] = [];
+    const received: number[] = [];
     const unsubscribe = subscribeTriggerEvents((e) => {
-      if (e.clientId === clientId) received.push(e);
+      if (e.clientId === clientId) received.push(e.id);
     });
-    try {
-      for (let i = 0; i < 4; i++) {
-        publishTriggerEvent({
-          clientId,
-          assignmentId: 1,
-          triggerId: 1,
-          agentStatus: "triggered",
-          firedAt: new Date().toISOString(),
-        });
-      }
-    } finally {
-      unsubscribe();
-    }
-
-    assert.equal(received.length, 4);
-    for (let i = 1; i < received.length; i++) {
-      assert.ok(
-        received[i].id > received[i - 1].id,
-        `id must strictly increase: ${received[i - 1].id} -> ${received[i].id}`,
-      );
-    }
+    publishTriggerEvent(ev(clientId, 1));
+    publishTriggerEvent(ev(clientId, 2));
+    unsubscribe();
+    publishTriggerEvent(ev(clientId, 3));
+    assert.deepEqual(received, [1, 2]);
   });
 
-  it("getEventsSince returns only events with an id greater than lastEventId", () => {
+  it("getMissedEvents replays only events newer than lastEventId", async () => {
     const clientId = 910002;
-    const ids: number[] = [];
-    const unsubscribe = subscribeTriggerEvents((e) => {
-      if (e.clientId === clientId) ids.push(e.id);
-    });
-    try {
-      for (let i = 0; i < 5; i++) {
-        publishTriggerEvent({
-          clientId,
-          assignmentId: 1,
-          triggerId: 1,
-          agentStatus: "triggered",
-          firedAt: new Date().toISOString(),
-        });
-      }
-    } finally {
-      unsubscribe();
-    }
+    for (let id = 101; id <= 105; id++) publishTriggerEvent(ev(clientId, id));
 
-    // Pretend the client last saw the 2nd event; only the last 3 are "missed".
-    const lastSeen = ids[1];
-    const missed = getEventsSince(clientId, lastSeen);
-    assert.deepEqual(
-      missed.map((e) => e.id),
-      ids.slice(2),
-    );
-    assert.ok(missed.every((e) => e.id > lastSeen));
-
-    // Nothing is missed if the client is already caught up.
-    assert.equal(getEventsSince(clientId, ids[ids.length - 1]).length, 0);
+    const missed = await getMissedEvents(clientId, 102);
+    assert.deepEqual(missed.map((e) => e.id), [103, 104, 105]);
+    assert.deepEqual(await getMissedEvents(clientId, 105), []);
   });
 
-  it("getEventsSince is scoped to a single client's ring buffer", () => {
-    const clientA = 910003;
-    const clientB = 910004;
-    publishTriggerEvent({ clientId: clientA, assignmentId: 1, triggerId: 1, agentStatus: "triggered", firedAt: new Date().toISOString() });
-    publishTriggerEvent({ clientId: clientB, assignmentId: 2, triggerId: 2, agentStatus: "triggered", firedAt: new Date().toISOString() });
-
-    const aEvents = getEventsSince(clientA, 0);
-    const bEvents = getEventsSince(clientB, 0);
-    assert.ok(aEvents.every((e) => e.clientId === clientA));
-    assert.ok(bEvents.every((e) => e.clientId === clientB));
-    // Unknown client has no ring buffer at all.
-    assert.deepEqual(getEventsSince(919999, 0), []);
+  it("getMissedEvents is scoped to a single client", async () => {
+    publishTriggerEvent(ev(910003, 201));
+    publishTriggerEvent(ev(910004, 202));
+    const a = await getMissedEvents(910003, 200);
+    const b = await getMissedEvents(910004, 201);
+    assert.ok(a.length === 1 && a[0].clientId === 910003);
+    assert.ok(b.length === 1 && b[0].clientId === 910004);
   });
 
-  it("caps the per-client ring buffer (old events drop, newest are retained)", () => {
+  it("caps the per-client ring at 50, keeping the newest events", async () => {
     const clientId = 910005;
-    const published: number[] = [];
-    for (let i = 0; i < 60; i++) {
-      const before = getEventsSince(clientId, 0);
-      void before;
-      publishTriggerEvent({ clientId, assignmentId: 1, triggerId: 1, agentStatus: "triggered", firedAt: new Date().toISOString() });
-    }
-    const all = getEventsSince(clientId, 0);
-    // Ring is bounded — it must never grow without limit.
-    assert.ok(all.length <= 50, `ring should be capped, got ${all.length}`);
+    for (let id = 1001; id <= 1060; id++) publishTriggerEvent(ev(clientId, id));
+    // Oldest retained id is 1011; asking from 1010 stays on the ring fast path.
+    const all = await getMissedEvents(clientId, 1010);
     assert.equal(all.length, 50);
-    // The most recent events survive; ids remain sorted ascending.
-    for (let i = 1; i < all.length; i++) {
-      assert.ok(all[i].id > all[i - 1].id);
-    }
-    void published;
+    assert.equal(all[0].id, 1011);
+    assert.equal(all[all.length - 1].id, 1060);
   });
 });

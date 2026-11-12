@@ -63,7 +63,7 @@ Respond with ONLY valid JSON (no markdown, no explanation):
       "You classify email leads. Output only valid JSON.",
       prompt,
     );
-    const raw = result.text;
+    const raw = result.content ?? "";
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");

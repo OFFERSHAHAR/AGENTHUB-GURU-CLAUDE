@@ -15,8 +15,8 @@ jobs:
         # Hit a DB-touching endpoint so BOTH Render (app) and Neon (database)
         # stay awake — /healthz alone wouldn't keep the DB warm.
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 https://agenthub-guru-claude-api.onrender.com/api/stats/summary)
-          echo "API /api/stats/summary -> $code"
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 https://agenthub-guru-claude-api.onrender.com/api/healthz/db)
+          echo "API /api/healthz/db -> $code"
       - name: Warm Frontend
         run: |
           code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 https://agenthub-guru-claude.onrender.com/)

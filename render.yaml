@@ -62,6 +62,19 @@ services:
       - key: INTAKE_FORM_URL
         sync: false
       - key: LOG_LEVEL
+      # Optional — referenced in code; leave empty to disable the feature.
+      - key: EMAIL_INBOUND_SECRET   # when set, /api/email/inbound requires header x-inbound-secret
+        sync: false
+      - key: FRONTEND_ORIGIN        # extra allowed CORS origin (custom domain)
+        sync: false
+      - key: GITHUB_TOKEN           # GitHub stars on the open-source hub (avoids rate limit)
+        sync: false
+      - key: N8N_BASE_URL
+        sync: false
+      - key: OLLAMA_BASE_URL
+        sync: false
+      - key: OLLAMA_MODEL
+        sync: false
         value: info
 
   # ---------- ה-frontend (Static Site, ללא Docker) ----------

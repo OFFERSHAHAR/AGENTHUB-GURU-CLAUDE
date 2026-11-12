@@ -100,9 +100,9 @@ function LeadRow({ lead, onDelete }: { lead: EmailLead; onDelete: (id: number) =
         {/* Telegram */}
         <div className="shrink-0">
           {lead.telegramSent ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" title="נשלח ל-Telegram" />
+            <span title="נשלח ל-Telegram"><CheckCircle2 className="w-4 h-4 text-emerald-500" /></span>
           ) : (
-            <XCircle className="w-4 h-4 text-slate-300" title="לא נשלח" />
+            <span title="לא נשלח"><XCircle className="w-4 h-4 text-slate-300" /></span>
           )}
         </div>
 

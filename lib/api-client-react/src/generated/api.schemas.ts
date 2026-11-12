@@ -143,6 +143,7 @@ export interface ClientUpdate {
   analysisStatus?: string;
   analysisDoc?: string;
   telegramChatId?: string;
+  ownerUser?: string | null;
 }
 
 export type ConversationMessageRole = typeof ConversationMessageRole[keyof typeof ConversationMessageRole];

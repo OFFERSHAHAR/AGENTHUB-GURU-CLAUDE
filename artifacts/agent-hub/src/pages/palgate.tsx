@@ -197,7 +197,7 @@ function PermitRow({ permit, onRefresh }: { permit: Permit; onRefresh: () => voi
   };
 
   const remove = async () => {
-    if (!confirm(`מחיקת הרשאה של ${permit.guestName}?`)) return;
+    if (!window.confirm(`מחיקת הרשאה של ${permit.guestName}?`)) return;
     setLoading("delete");
     try {
       await apiFetch(`/palgate/permits/${permit.id}`, { method: "DELETE" });

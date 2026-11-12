@@ -64,6 +64,13 @@ async function sendTelegramNotification(text: string): Promise<void> {
  *  4. Send Telegram notification with lead summary
  */
 router.post("/email/inbound", async (req, res): Promise<void> => {
+  // Optional shared secret: once EMAIL_INBOUND_SECRET is set, the forwarder
+  // (n8n / Apps Script / mail hook) must send it as the x-inbound-secret header.
+  const inboundSecret = process.env.EMAIL_INBOUND_SECRET;
+  if (inboundSecret && req.get("x-inbound-secret") !== inboundSecret) {
+    res.status(401).json({ error: "invalid_inbound_secret" });
+    return;
+  }
   const { from, subject, body, fromName } = req.body as {
     from?: string;
     subject?: string;
@@ -101,7 +108,6 @@ router.post("/email/inbound", async (req, res): Promise<void> => {
 Subject: ${emailSubject}
 
 ${body}`,
-        1024
       );
       if (result.content && result.content !== "__TEMPLATE__") {
         try {

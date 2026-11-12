@@ -8,6 +8,7 @@ import {
   sendMessage,
   clearConversation,
   getGetClientQueryKey,
+  getGetAgentQueryKey,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -154,7 +155,7 @@ export default function ChatPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: client } = useGetClient(clientId, { query: { enabled: !!clientId, queryKey: getGetClientQueryKey(clientId) } });
-  const { data: agent } = useGetAgent(agentId, { query: { enabled: !!agentId } });
+  const { data: agent } = useGetAgent(agentId, { query: { enabled: !!agentId, queryKey: getGetAgentQueryKey(agentId) } });
 
   const convKey = ["conversation", clientId, agentId];
   const { data: conversation, isLoading: convLoading } = useQuery({
